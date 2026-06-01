@@ -69,7 +69,7 @@ def test_leaderboard_empty(client: TestClient):
 
 
 def test_leaderboard_with_submissions(client: TestClient):
-    client.post("/submissions", json=GOOD_SUBMISSION)
+    r1 = client.post("/submissions", json=GOOD_SUBMISSION)
     heavier = {**GOOD_SUBMISSION, "contributor": "Other", "mass_grams": 150.0, "commit_hash": "xyz"}
     client.post("/submissions", json=heavier)
 
@@ -79,6 +79,9 @@ def test_leaderboard_with_submissions(client: TestClient):
     assert len(entries) == 2
     assert entries[0]["rank"] == 1
     assert entries[0]["mass_grams"] == 108.48  # lightest first
+    assert "submission_id" in entries[0]
+    assert entries[0]["submission_id"] == r1.json()["id"]
+    assert entries[0]["has_step"] is False
 
 
 def test_sota_missing_spec(client: TestClient):

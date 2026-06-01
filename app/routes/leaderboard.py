@@ -21,22 +21,34 @@ async def get_leaderboard(spec_id: str):
 
 
 async def _build_leaderboard(spec_id: str) -> Leaderboard:
-    # Best score per contributor (lowest mass among passed submissions)
+    # Best submission per contributor: the row with minimum mass.
+    # Subquery finds the min-mass submission ID per contributor so we can
+    # return submission_id (for the STEP viewer) and has_step.
     query = """
-        SELECT contributor, agent_path, MIN(mass_grams) as mass_grams,
-               fea_stress_mpa, commit_hash, submitted_at, pr_number
-        FROM submissions
-        WHERE spec_id = ? AND passed = 1
-        GROUP BY contributor
-        ORDER BY mass_grams ASC
+        SELECT s.id as submission_id, s.contributor, s.agent_path,
+               s.mass_grams, s.fea_stress_mpa, s.commit_hash,
+               s.submitted_at, s.pr_number,
+               (s.step_data IS NOT NULL) as has_step
+        FROM submissions s
+        INNER JOIN (
+            SELECT contributor, MIN(mass_grams) as min_mass
+            FROM submissions
+            WHERE spec_id = ? AND passed = 1
+            GROUP BY contributor
+        ) best ON s.contributor = best.contributor
+               AND s.mass_grams = best.min_mass
+               AND s.spec_id = ?
+               AND s.passed = 1
+        ORDER BY s.mass_grams ASC
     """
     async with get_db() as db:
-        async with db.execute(query, (spec_id,)) as cur:
+        async with db.execute(query, (spec_id, spec_id)) as cur:
             rows = await cur.fetchall()
 
     entries = [
         LeaderboardEntry(
             rank=i + 1,
+            submission_id=r["submission_id"],
             contributor=r["contributor"],
             agent_path=r["agent_path"],
             mass_grams=r["mass_grams"],
@@ -44,6 +56,7 @@ async def _build_leaderboard(spec_id: str) -> Leaderboard:
             commit_hash=r["commit_hash"],
             submitted_at=r["submitted_at"],
             pr_number=r["pr_number"],
+            has_step=bool(r["has_step"]),
         )
         for i, r in enumerate(rows)
     ]

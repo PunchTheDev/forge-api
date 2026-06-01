@@ -70,6 +70,7 @@ class Submission(BaseModel):
 
 class LeaderboardEntry(BaseModel):
     rank: int
+    submission_id: str
     contributor: str
     agent_path: str
     mass_grams: float
@@ -77,6 +78,7 @@ class LeaderboardEntry(BaseModel):
     commit_hash: str
     submitted_at: datetime
     pr_number: int | None = None
+    has_step: bool = False
 
 
 class Leaderboard(BaseModel):
