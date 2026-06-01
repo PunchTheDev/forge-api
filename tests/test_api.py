@@ -106,3 +106,36 @@ def test_sota_best_wins(client: TestClient):
     client.post("/submissions", json=better)
     r = client.get("/sota/001_bracket")
     assert r.json()["score_grams"] == 95.0
+
+
+def test_submission_has_step_false_without_data(client: TestClient):
+    r = client.post("/submissions", json=GOOD_SUBMISSION)
+    assert r.status_code == 201
+    assert r.json()["has_step"] is False
+
+
+def test_submission_has_step_true_with_data(client: TestClient):
+    import base64
+    step_bytes = b"ISO-10303-21;\nHEADER;\nENDSEC;\nDATA;\nENDSEC;\nEND-ISO-10303-21;\n"
+    sub = {**GOOD_SUBMISSION, "step_b64": base64.b64encode(step_bytes).decode()}
+    r = client.post("/submissions", json=sub)
+    assert r.status_code == 201
+    body = r.json()
+    assert body["has_step"] is True
+    sub_id = body["id"]
+
+    step_r = client.get(f"/submissions/{sub_id}/step")
+    assert step_r.status_code == 200
+    assert step_r.content == step_bytes
+
+
+def test_submission_step_404_no_step(client: TestClient):
+    r = client.post("/submissions", json=GOOD_SUBMISSION)
+    sub_id = r.json()["id"]
+    r2 = client.get(f"/submissions/{sub_id}/step")
+    assert r2.status_code == 404
+
+
+def test_submission_step_404_missing_id(client: TestClient):
+    r = client.get("/submissions/00000000-0000-0000-0000-000000000000/step")
+    assert r.status_code == 404

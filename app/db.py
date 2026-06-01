@@ -20,8 +20,13 @@ CREATE TABLE IF NOT EXISTS submissions (
     passed      INTEGER NOT NULL,
     pr_number   INTEGER,
     notes       TEXT,
-    submitted_at TEXT NOT NULL
+    submitted_at TEXT NOT NULL,
+    step_data   BLOB
 )
+"""
+
+MIGRATE_ADD_STEP_DATA = """
+ALTER TABLE submissions ADD COLUMN step_data BLOB
 """
 
 CREATE_INDEXES = [
@@ -37,6 +42,11 @@ async def init_db() -> None:
         await db.execute(CREATE_SUBMISSIONS)
         for idx in CREATE_INDEXES:
             await db.execute(idx)
+        # Migrate existing DBs that predate the step_data column.
+        async with db.execute("PRAGMA table_info(submissions)") as cur:
+            cols = {row[1] async for row in cur}
+        if "step_data" not in cols:
+            await db.execute(MIGRATE_ADD_STEP_DATA)
         await db.commit()
 
 
