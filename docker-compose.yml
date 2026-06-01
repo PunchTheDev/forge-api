@@ -1,0 +1,11 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      DB_PATH: data/forge.db
+      SPECS_DIR: data/specs
+    restart: unless-stopped
