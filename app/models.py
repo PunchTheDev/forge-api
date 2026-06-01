@@ -46,11 +46,24 @@ class SubmissionCreate(BaseModel):
     passed: bool
     pr_number: int | None = None
     notes: str | None = None
+    # Base64-encoded STEP bytes; stored server-side, not echoed back in responses.
+    step_b64: str | None = None
 
 
-class Submission(SubmissionCreate):
+class Submission(BaseModel):
     id: UUID
+    spec_id: str
+    agent_path: str
+    contributor: str
+    commit_hash: str
+    mass_grams: float
+    fea_stress_mpa: float
+    fea_allowable_mpa: float
+    passed: bool
+    pr_number: int | None = None
+    notes: str | None = None
     submitted_at: datetime
+    has_step: bool = False
 
     model_config = {"from_attributes": True}
 

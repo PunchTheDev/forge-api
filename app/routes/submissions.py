@@ -1,7 +1,9 @@
+import base64
 import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import Response
 
 from app.db import get_db
 from app.models import Submission, SubmissionCreate
@@ -13,13 +15,14 @@ router = APIRouter(prefix="/submissions", tags=["submissions"])
 async def create_submission(body: SubmissionCreate):
     sub_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
+    step_data = base64.b64decode(body.step_b64) if body.step_b64 else None
 
     async with get_db() as db:
         await db.execute(
             """INSERT INTO submissions
                (id, spec_id, agent_path, contributor, commit_hash, mass_grams,
-                fea_stress_mpa, fea_allowable_mpa, passed, pr_number, notes, submitted_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                fea_stress_mpa, fea_allowable_mpa, passed, pr_number, notes, submitted_at, step_data)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 sub_id,
                 body.spec_id,
@@ -33,11 +36,12 @@ async def create_submission(body: SubmissionCreate):
                 body.pr_number,
                 body.notes,
                 now,
+                step_data,
             ),
         )
         await db.commit()
 
-    return Submission(id=uuid.UUID(sub_id), submitted_at=datetime.fromisoformat(now), **body.model_dump())
+    return _build_submission(sub_id, now, body, step_data is not None)
 
 
 @router.get("", response_model=list[Submission])
@@ -80,6 +84,25 @@ async def get_submission(submission_id: str):
     return _row_to_submission(row)
 
 
+@router.get("/{submission_id}/step")
+async def get_submission_step(submission_id: str):
+    """Return the raw STEP file bytes for 3D viewing."""
+    async with get_db() as db:
+        async with db.execute(
+            "SELECT step_data FROM submissions WHERE id = ?", (submission_id,)
+        ) as cur:
+            row = await cur.fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    if row["step_data"] is None:
+        raise HTTPException(status_code=404, detail="No STEP file stored for this submission")
+    return Response(
+        content=bytes(row["step_data"]),
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f"attachment; filename={submission_id}.step"},
+    )
+
+
 def _row_to_submission(row) -> Submission:
     return Submission(
         id=uuid.UUID(row["id"]),
@@ -94,4 +117,23 @@ def _row_to_submission(row) -> Submission:
         pr_number=row["pr_number"],
         notes=row["notes"],
         submitted_at=datetime.fromisoformat(row["submitted_at"]),
+        has_step=row["step_data"] is not None,
+    )
+
+
+def _build_submission(sub_id: str, now: str, body: SubmissionCreate, has_step: bool) -> Submission:
+    return Submission(
+        id=uuid.UUID(sub_id),
+        spec_id=body.spec_id,
+        agent_path=body.agent_path,
+        contributor=body.contributor,
+        commit_hash=body.commit_hash,
+        mass_grams=body.mass_grams,
+        fea_stress_mpa=body.fea_stress_mpa,
+        fea_allowable_mpa=body.fea_allowable_mpa,
+        passed=body.passed,
+        pr_number=body.pr_number,
+        notes=body.notes,
+        submitted_at=datetime.fromisoformat(now),
+        has_step=has_step,
     )
