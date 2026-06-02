@@ -89,3 +89,50 @@ def test_round_specs_structure(rounds_client):
     assert specs[0]["id"] == "r_001_easy"
     assert specs[0]["tier"] == "easy"
     assert "file" in specs[0]
+
+
+def test_upcoming_round_null_starts(tmp_path, monkeypatch):
+    """Rounds with starts=null (upcoming) load without validation errors."""
+    rounds_dir = tmp_path / "rounds"
+    rounds_dir.mkdir()
+    specs_dir = tmp_path / "specs"
+    specs_dir.mkdir()
+
+    upcoming = {
+        "id": "round_002",
+        "name": "Round 2 — Stiffness-to-Weight",
+        "description": "Maximize stiffness-to-weight ratio.",
+        "status": "upcoming",
+        "starts": None,
+        "ends": None,
+        "scoring_metric": "stiffness_to_weight",
+        "scoring_direction": "maximize",
+        "specs": [{"id": "r02_001_easy", "tier": "easy"}],
+        "notes": None,
+    }
+    (rounds_dir / "round_002.json").write_text(json.dumps(upcoming))
+
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("SPECS_DIR", str(specs_dir))
+    monkeypatch.setenv("ROUNDS_DIR", str(rounds_dir))
+
+    import importlib
+    import app.db, app.main, app.routes.rounds
+    importlib.reload(app.db)
+    importlib.reload(app.routes.rounds)
+    importlib.reload(app.main)
+    from app.main import app
+    from fastapi.testclient import TestClient
+
+    with TestClient(app) as c:
+        resp = c.get("/rounds")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["id"] == "round_002"
+        assert data[0]["starts"] is None
+        assert data[0]["status"] == "upcoming"
+
+        resp2 = c.get("/rounds/active")
+        assert resp2.status_code == 200
+        assert len(resp2.json()) == 0  # upcoming rounds are not active
