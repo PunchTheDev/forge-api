@@ -82,6 +82,9 @@ class LeaderboardEntry(BaseModel):
     contributor: str
     agent_path: str
     mass_grams: float
+    score: float
+    score_metric: str
+    score_direction: str
     fea_stress_mpa: float
     commit_hash: str
     submitted_at: datetime
