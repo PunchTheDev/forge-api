@@ -24,7 +24,8 @@ async def create_submission(body: SubmissionCreate):
     step_data = base64.b64decode(body.step_b64) if body.step_b64 else None
 
     # Compute SOTA eligibility before inserting so we can store it.
-    eligible = await _compute_eligibility(body.spec_id, body.mass_grams)
+    score_for_eligibility = body.score if body.score is not None else body.mass_grams
+    eligible = await _compute_eligibility(body.spec_id, score_for_eligibility, body.score_direction)
 
     async with get_db() as db:
         async with db.execute(
@@ -198,12 +199,21 @@ async def get_submission_step(submission_id: str):
     )
 
 
-async def _compute_eligibility(spec_id: str, mass_grams: float) -> bool:
-    """Look up the current SOTA and determine if mass_grams is SOTA-eligible."""
+async def _compute_eligibility(spec_id: str, score: float, direction: str = "minimize") -> bool:
+    """Look up the current SOTA and determine if score is SOTA-eligible.
+
+    Uses direction-aware ordering: for 'maximize' metrics the best SOTA has the
+    highest score; for 'minimize' metrics the best has the lowest.
+    """
     query = """
-        SELECT mass_grams, submitted_at FROM submissions
+        SELECT COALESCE(score, mass_grams) AS best_score, submitted_at
+        FROM submissions
         WHERE spec_id = ? AND passed = 1
-        ORDER BY mass_grams ASC
+        ORDER BY
+            CASE WHEN COALESCE(score_direction, 'minimize') = 'maximize'
+                 THEN -COALESCE(score, mass_grams)
+                 ELSE  COALESCE(score, mass_grams)
+            END ASC
         LIMIT 1
     """
     async with get_db() as db:
@@ -213,10 +223,10 @@ async def _compute_eligibility(spec_id: str, mass_grams: float) -> bool:
     if row is None:
         return True  # No existing SOTA — always eligible.
 
-    current_score = row["mass_grams"]
+    current_score = row["best_score"]
     sota_at = datetime.fromisoformat(row["submitted_at"]).replace(tzinfo=timezone.utc)
     age_days = (datetime.now(timezone.utc) - sota_at).total_seconds() / 86400
-    eligible, _ = compute_sota_eligible(mass_grams, current_score, age_days)
+    eligible, _ = compute_sota_eligible(score, current_score, age_days, direction)
     return eligible
 
 

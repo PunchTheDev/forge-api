@@ -252,3 +252,68 @@ def test_sota_maximize_picks_highest(client: TestClient):
     r = client.get("/sota/001_bracket")
     assert r.status_code == 200
     assert r.json()["score"] == 200.0
+
+
+# --- direction-aware eligibility ---
+
+def test_eligibility_minimize_no_sota(client: TestClient):
+    r = client.get("/sota/001_bracket/eligibility?score=100.0")
+    assert r.status_code == 200
+    assert r.json()["eligible"] is True
+    assert r.json()["reason"] == "No current SOTA — any passing submission is eligible"
+
+
+def test_eligibility_minimize_beats_by_margin(client: TestClient):
+    """Minimize: new score must be ≥1% lower than current SOTA (within first 7 days)."""
+    client.post("/submissions", json=GOOD_SUBMISSION)  # SOTA = 108.48
+    # 108.48 * 0.99 = 107.3952 — need to score ≤107.3952
+    r = client.get("/sota/001_bracket/eligibility?score=107.0")
+    assert r.status_code == 200
+    assert r.json()["eligible"] is True
+
+
+def test_eligibility_minimize_short_of_margin(client: TestClient):
+    """Minimize: a score that beats SOTA but by less than 1% is ineligible."""
+    client.post("/submissions", json=GOOD_SUBMISSION)  # SOTA = 108.48
+    # 108.48 * 0.995 = 107.9376 — marginal improvement, less than 1%
+    r = client.get("/sota/001_bracket/eligibility?score=108.0")
+    assert r.status_code == 200
+    assert r.json()["eligible"] is False
+
+
+def test_eligibility_maximize_no_sota(client: TestClient):
+    r = client.get("/sota/001_bracket/eligibility?score=300.0")
+    assert r.status_code == 200
+    assert r.json()["eligible"] is True
+
+
+def test_eligibility_maximize_beats_by_margin(client: TestClient):
+    """Maximize: new score must be ≥1% higher than current SOTA (within first 7 days)."""
+    sub = {**GOOD_SUBMISSION, "score": 200.0, "score_metric": "stiffness_to_weight",
+           "score_direction": "maximize", "commit_hash": "max1"}
+    client.post("/submissions", json=sub)  # SOTA = 200.0
+    # 200.0 * 1.01 = 202.0 — need to score ≥202.0
+    r = client.get("/sota/001_bracket/eligibility?score=205.0")
+    assert r.status_code == 200
+    assert r.json()["eligible"] is True
+
+
+def test_eligibility_maximize_short_of_margin(client: TestClient):
+    """Maximize: a score that beats SOTA but by less than 1% is ineligible."""
+    sub = {**GOOD_SUBMISSION, "score": 200.0, "score_metric": "stiffness_to_weight",
+           "score_direction": "maximize", "commit_hash": "max2"}
+    client.post("/submissions", json=sub)  # SOTA = 200.0
+    # 201.0 beats but only by 0.5%, below the 1% threshold
+    r = client.get("/sota/001_bracket/eligibility?score=201.0")
+    assert r.status_code == 200
+    assert r.json()["eligible"] is False
+
+
+def test_eligibility_maximize_lower_than_sota_ineligible(client: TestClient):
+    """Maximize: a score lower than SOTA is never eligible."""
+    sub = {**GOOD_SUBMISSION, "score": 200.0, "score_metric": "stiffness_to_weight",
+           "score_direction": "maximize", "commit_hash": "max3"}
+    client.post("/submissions", json=sub)  # SOTA = 200.0
+    r = client.get("/sota/001_bracket/eligibility?score=150.0")
+    assert r.status_code == 200
+    assert r.json()["eligible"] is False
