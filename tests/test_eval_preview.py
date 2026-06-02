@@ -129,6 +129,22 @@ def test_preview_bad_json_output(client):
     assert resp.status_code == 500
 
 
+def test_preview_rate_limit(client):
+    """After exhausting the per-IP daily limit, requests return 429."""
+    from datetime import datetime, timezone
+    import app.routes.eval_preview as ep
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    # Simulate the test client IP already at the daily cap.
+    ep._preview_counts["testclient"] = (today, ep.MAX_PREVIEWS_PER_IP_PER_DAY)
+
+    resp = client.post("/eval/preview", json={"agent_code": AGENT_CODE, "spec_id": "001_bracket"})
+    assert resp.status_code == 429
+
+    # Clean up so other tests are not affected.
+    del ep._preview_counts["testclient"]
+
+
 def test_preview_docker_cmd_no_duplicate_entrypoint():
     """Ensure the docker cmd doesn't duplicate the Dockerfile ENTRYPOINT."""
     from app.routes.eval_preview import _build_docker_cmd
