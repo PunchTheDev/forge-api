@@ -47,6 +47,16 @@ async def init_db() -> None:
             cols = {row[1] async for row in cur}
         if "step_data" not in cols:
             await db.execute(MIGRATE_ADD_STEP_DATA)
+
+        # Data correction: thin-frame submission (7450daa) claimed 27g but fails
+        # FEA at 60.3 MPa > 25.0 MPa allowable (1.2mm plate insufficient at bolt holes).
+        # Mark as failed so the leaderboard reflects the real verified SOTA.
+        await db.execute(
+            "UPDATE submissions SET passed = 0, "
+            "notes = 'Invalidated: 1.2mm plate fails FEA at bolt holes (60.3 MPa > 25 MPa)' "
+            "WHERE commit_hash = '7450daa' AND passed = 1"
+        )
+
         await db.commit()
 
 
