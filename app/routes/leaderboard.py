@@ -26,7 +26,7 @@ async def get_overall_leaderboard():
     """
     all_specs = spec_store.load_all()
     total_specs = len(all_specs)
-    baseline_by_spec = {s.id: s.scoring.baseline_mass_grams for s in all_specs}
+    baseline_by_spec = {s.id: s.scoring.baseline_score for s in all_specs}
     direction_by_spec = {s.id: s.scoring.direction for s in all_specs}
 
     # Per-spec best per contributor, direction-aware.
