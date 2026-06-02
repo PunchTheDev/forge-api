@@ -43,6 +43,7 @@ async def get_overall_leaderboard():
             query = f"""
                 SELECT s.id as submission_id, s.contributor,
                        s.mass_grams, COALESCE(s.score, s.mass_grams) as score,
+                       COALESCE(s.score_metric, 'mass_grams') as score_metric,
                        s.submitted_at
                 FROM submissions s
                 INNER JOIN (
@@ -75,6 +76,8 @@ async def get_overall_leaderboard():
                     spec_id=spec_id,
                     rank=rank_idx + 1,
                     mass_grams=row["mass_grams"],
+                    score=score,
+                    score_metric=row["score_metric"],
                     normalized_score=normalized,
                     submission_id=row["submission_id"],
                     submitted_at=row["submitted_at"],

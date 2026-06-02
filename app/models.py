@@ -116,6 +116,8 @@ class OverallBestEntry(BaseModel):
     spec_id: str
     rank: int
     mass_grams: float
+    score: float  # canonical score value for this spec's metric
+    score_metric: str  # e.g. "mass_grams", "stiffness_to_weight", "deflection_mm"
     normalized_score: float  # score / baseline_score (or baseline_score / score for maximize)
     submission_id: str
     submitted_at: datetime
