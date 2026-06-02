@@ -3,7 +3,7 @@ import os
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import Response
 
 from app.db import get_db
@@ -101,6 +101,21 @@ async def get_submission(submission_id: str):
     if row is None:
         raise HTTPException(status_code=404, detail="Submission not found")
     return _row_to_submission(row)
+
+
+@router.delete("/{submission_id}", status_code=204)
+async def delete_submission(submission_id: str, x_admin_token: str | None = Header(None)):
+    """Delete a submission by ID. Requires X-Admin-Token header matching ADMIN_SECRET env var."""
+    expected = os.environ.get("ADMIN_SECRET", "")
+    if not expected or x_admin_token != expected:
+        raise HTTPException(status_code=403, detail="Invalid or missing admin token")
+    async with get_db() as db:
+        async with db.execute("SELECT id FROM submissions WHERE id = ?", (submission_id,)) as cur:
+            row = await cur.fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Submission not found")
+        await db.execute("DELETE FROM submissions WHERE id = ?", (submission_id,))
+        await db.commit()
 
 
 @router.get("/{submission_id}/step")
