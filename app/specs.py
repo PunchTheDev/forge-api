@@ -14,16 +14,23 @@ def load_all() -> list[Spec]:
     if not path.exists():
         return []
     specs = []
-    for f in sorted(path.glob("*.json")):
-        with open(f) as fh:
-            raw = json.load(fh)
-        specs.append(Spec.model_validate(raw))
+    for f in sorted(path.glob("**/*.json")):
+        try:
+            with open(f) as fh:
+                raw = json.load(fh)
+            specs.append(Spec.model_validate(raw))
+        except Exception:
+            pass
     return specs
 
 
 def load_one(spec_id: str) -> Spec | None:
-    path = Path(SPECS_DIR) / f"{spec_id}.json"
-    if not path.exists():
-        return None
-    with open(path) as fh:
-        return Spec.model_validate(json.load(fh))
+    # Check top-level first, then subdirectories
+    top = Path(SPECS_DIR) / f"{spec_id}.json"
+    if top.exists():
+        with open(top) as fh:
+            return Spec.model_validate(json.load(fh))
+    for f in Path(SPECS_DIR).glob(f"**/{spec_id}.json"):
+        with open(f) as fh:
+            return Spec.model_validate(json.load(fh))
+    return None

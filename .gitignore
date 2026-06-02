@@ -6,4 +6,5 @@ dist/
 build/
 data/forge.db
 data/specs/
+data/rounds/*.db
 .pytest_cache/
