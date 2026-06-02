@@ -21,12 +21,19 @@ import json
 import os
 import shutil
 import tempfile
+from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from app import specs as spec_store
+
+# Per-IP daily rate limit for the eval preview endpoint.
+MAX_PREVIEWS_PER_IP_PER_DAY = int(os.environ.get("MAX_PREVIEWS_PER_IP_PER_DAY", "10"))
+# {ip: (date_str, count)}
+_preview_counts: dict[str, tuple[str, int]] = defaultdict(lambda: ("", 0))
 
 router = APIRouter(prefix="/eval", tags=["eval"])
 
@@ -59,9 +66,23 @@ class PreviewResult(BaseModel):
 
 
 @router.post("/preview", response_model=PreviewResult)
-async def eval_preview(body: PreviewRequest):
+async def eval_preview(body: PreviewRequest, request: Request):
     if len(body.agent_code.encode()) > MAX_AGENT_BYTES:
         raise HTTPException(status_code=413, detail="agent_code exceeds 64 KB limit")
+
+    # Per-IP rate limit (in-memory, resets at UTC midnight).
+    ip = request.client.host if request.client else "unknown"
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    day, count = _preview_counts[ip]
+    if day != today:
+        _preview_counts[ip] = (today, 1)
+    else:
+        if count >= MAX_PREVIEWS_PER_IP_PER_DAY:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Rate limit: {MAX_PREVIEWS_PER_IP_PER_DAY} eval previews per IP per UTC day.",
+            )
+        _preview_counts[ip] = (today, count + 1)
 
     # Validate spec exists and read raw JSON (preserves all fields for eval harness).
     spec_path = Path(SPECS_DIR) / f"{body.spec_id}.json"
