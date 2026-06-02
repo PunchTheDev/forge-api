@@ -127,3 +127,15 @@ def test_preview_bad_json_output(client):
             json={"agent_code": AGENT_CODE, "spec_id": "001_bracket"},
         )
     assert resp.status_code == 500
+
+
+def test_preview_docker_cmd_no_duplicate_entrypoint():
+    """Ensure the docker cmd doesn't duplicate the Dockerfile ENTRYPOINT."""
+    from app.routes.eval_preview import _build_docker_cmd
+
+    cmd = _build_docker_cmd("/tmp/fake")
+    # The ENTRYPOINT in the forge-eval image is `python3 -m benchmark.evaluate`.
+    # It must appear exactly once — as the args following the image name.
+    image_idx = cmd.index("forge-eval")
+    post_image = cmd[image_idx + 1:]
+    assert post_image == ["--agent", "/preview/agent.py", "--spec", "/preview/spec.json", "--json-compact"]
