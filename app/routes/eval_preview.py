@@ -85,9 +85,13 @@ async def eval_preview(body: PreviewRequest, request: Request):
         _preview_counts[ip] = (today, count + 1)
 
     # Validate spec exists and read raw JSON (preserves all fields for eval harness).
+    # Check top-level first, then subdirectories (round_001/, round_002/, etc.)
     spec_path = Path(SPECS_DIR) / f"{body.spec_id}.json"
     if not spec_path.exists():
-        raise HTTPException(status_code=404, detail=f"Spec '{body.spec_id}' not found")
+        matches = list(Path(SPECS_DIR).glob(f"**/{body.spec_id}.json"))
+        if not matches:
+            raise HTTPException(status_code=404, detail=f"Spec '{body.spec_id}' not found")
+        spec_path = matches[0]
     spec_raw = spec_path.read_text()
 
     tmpdir = tempfile.mkdtemp(prefix="forge-preview-")
