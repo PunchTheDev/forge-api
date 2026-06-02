@@ -30,15 +30,18 @@ SPEC2_SUB = {
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
-    # Override both env vars — also reload app.specs since SPECS_DIR is a module-level constant
+    # Override env vars; reload affected modules so module-level constants pick up changes.
     monkeypatch.setenv("DB_PATH", str(tmp_path / "test.db"))
     monkeypatch.setenv("SPECS_DIR", "tests/fixtures/specs_multi")
+    monkeypatch.setenv("ROUNDS_DIR", "tests/fixtures/rounds_multi")
     import app.db
     import app.specs
+    import app.routes.rounds
     import app.routes.leaderboard
     import app.main
     importlib.reload(app.db)
     importlib.reload(app.specs)
+    importlib.reload(app.routes.rounds)
     importlib.reload(app.routes.leaderboard)
     importlib.reload(app.main)
     from app.main import app

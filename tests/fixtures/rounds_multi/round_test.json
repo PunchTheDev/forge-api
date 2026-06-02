@@ -1,0 +1,16 @@
+{
+  "id": "round_test",
+  "name": "Test Round",
+  "description": "Fixture round containing all multi-spec test specs.",
+  "status": "active",
+  "starts": "2026-01-01",
+  "ends": null,
+  "scoring_metric": "mass_grams",
+  "scoring_direction": "minimize",
+  "specs": [
+    {"id": "001_bracket",      "tier": "easy"},
+    {"id": "002_bracket_hard", "tier": "medium"},
+    {"id": "003_stiffness_spec",    "tier": "hard"}
+  ],
+  "notes": null
+}
