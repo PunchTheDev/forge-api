@@ -52,7 +52,7 @@ def test_overall_empty(client: TestClient):
     r = client.get("/leaderboard/overall")
     assert r.status_code == 200
     body = r.json()
-    assert body["total_specs"] == 2
+    assert body["total_specs"] == 3
     assert body["entries"] == []
 
 
