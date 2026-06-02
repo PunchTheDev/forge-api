@@ -23,8 +23,8 @@ class Round(BaseModel):
     name: str
     description: str
     status: str
-    starts: str
-    ends: str | None
+    starts: str | None = None
+    ends: str | None = None
     scoring_metric: str
     scoring_direction: str
     specs: list[RoundSpec]
