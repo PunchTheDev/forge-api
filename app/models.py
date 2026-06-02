@@ -22,7 +22,20 @@ class SpecConstraints(BaseModel):
 class SpecScoring(BaseModel):
     metric: str
     direction: Literal["minimize", "maximize"]
-    baseline_mass_grams: float
+    baseline_mass_grams: float | None = None
+    baseline_stiffness_to_weight: float | None = None
+    baseline_deflection_mm: float | None = None
+
+    @property
+    def baseline_score(self) -> float | None:
+        """Return the baseline value for this spec's primary metric."""
+        if self.metric == "mass_grams":
+            return self.baseline_mass_grams
+        if self.metric == "stiffness_to_weight":
+            return self.baseline_stiffness_to_weight
+        if self.metric == "deflection_mm":
+            return self.baseline_deflection_mm
+        return self.baseline_mass_grams
 
 
 class Spec(BaseModel):
@@ -103,7 +116,7 @@ class OverallBestEntry(BaseModel):
     spec_id: str
     rank: int
     mass_grams: float
-    normalized_score: float  # mass_grams / baseline_mass_grams
+    normalized_score: float  # score / baseline_score (or baseline_score / score for maximize)
     submission_id: str
     submitted_at: datetime
 
