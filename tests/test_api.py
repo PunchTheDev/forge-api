@@ -95,12 +95,15 @@ def test_sota_no_submissions(client: TestClient):
 
 
 def test_sota_with_submission(client: TestClient):
-    client.post("/submissions", json=GOOD_SUBMISSION)
+    sub = client.post("/submissions", json=GOOD_SUBMISSION)
     r = client.get("/sota/001_bracket")
     assert r.status_code == 200
     sota = r.json()
     assert sota["score_grams"] == 108.48
     assert sota["contributor"] == "TestMiner"
+    assert "submission_id" in sota
+    assert sota["submission_id"] == sub.json()["id"]
+    assert "has_step" in sota
 
 
 def test_sota_best_wins(client: TestClient):
@@ -209,3 +212,43 @@ def test_rate_limit_default_is_20(client: TestClient, monkeypatch):
     import app.routes.submissions as sub_mod
     importlib.reload(sub_mod)
     assert sub_mod.MAX_EVALS_PER_DAY == 20
+
+
+# --- score_direction ---
+
+def test_submission_default_direction_is_minimize(client: TestClient):
+    r = client.post("/submissions", json=GOOD_SUBMISSION)
+    assert r.status_code == 201
+    assert r.json()["score_direction"] == "minimize"
+
+
+def test_submission_maximize_direction_stored(client: TestClient):
+    sub = {**GOOD_SUBMISSION, "score": 185.5, "score_metric": "stiffness_to_weight",
+           "score_direction": "maximize", "commit_hash": "stiff1"}
+    r = client.post("/submissions", json=sub)
+    assert r.status_code == 201
+    body = r.json()
+    assert body["score_direction"] == "maximize"
+    assert body["score_metric"] == "stiffness_to_weight"
+    assert body["score"] == 185.5
+
+
+def test_sota_direction_in_response(client: TestClient):
+    client.post("/submissions", json=GOOD_SUBMISSION)
+    r = client.get("/sota/001_bracket")
+    assert r.status_code == 200
+    assert "score_direction" in r.json()
+    assert r.json()["score_direction"] == "minimize"
+
+
+def test_sota_maximize_picks_highest(client: TestClient):
+    """For maximize direction, the submission with the highest score should be SOTA."""
+    low = {**GOOD_SUBMISSION, "score": 50.0, "score_metric": "stiffness_to_weight",
+           "score_direction": "maximize", "commit_hash": "stiff_low"}
+    high = {**GOOD_SUBMISSION, "score": 200.0, "score_metric": "stiffness_to_weight",
+            "score_direction": "maximize", "commit_hash": "stiff_high", "contributor": "Other"}
+    client.post("/submissions", json=low)
+    client.post("/submissions", json=high)
+    r = client.get("/sota/001_bracket")
+    assert r.status_code == 200
+    assert r.json()["score"] == 200.0
