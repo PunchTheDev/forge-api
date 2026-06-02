@@ -1,0 +1,23 @@
+{
+  "id": "003_stiffness_spec",
+  "version": "1.0",
+  "name": "Stiffness Spec — PLA — maximize stiffness-to-weight",
+  "description": "Test fixture for stiffness_to_weight metric.",
+  "material": "pla",
+  "constraints": {
+    "load_newtons": 200.0,
+    "load_point_mm": [100.0, 25.0, 25.0],
+    "safety_factor": 1.5,
+    "bolt_pattern_mm": [[0.0, 0.0], [50.0, 0.0], [0.0, 50.0], [50.0, 50.0]],
+    "bolt_diameter_clearance_mm": 6.5,
+    "mount_face_x_mm": 0.0,
+    "build_volume_mm": [120.0, 80.0, 80.0],
+    "max_overhang_deg": 50.0,
+    "min_wall_thickness_mm": 1.0
+  },
+  "scoring": {
+    "metric": "stiffness_to_weight",
+    "direction": "maximize",
+    "baseline_stiffness_to_weight": 300.0
+  }
+}
