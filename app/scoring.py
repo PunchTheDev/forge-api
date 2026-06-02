@@ -27,24 +27,39 @@ def sota_eligible(
     new_score: float,
     current_score: float,
     current_sota_age_days: float,
+    direction: str = "minimize",
 ) -> tuple[bool, str]:
     """Return (is_eligible, reason).
 
     A submission is eligible when it beats current_score by the required margin.
-    Lower score is better (mass minimization).
+    direction='minimize': lower is better (mass, volume).
+    direction='maximize': higher is better (stiffness_to_weight).
     """
     threshold_pct = sota_margin_threshold(current_sota_age_days)
-    required_improvement = current_score * threshold_pct
-    required_score = current_score - required_improvement
+    required_improvement = abs(current_score) * threshold_pct
 
-    if new_score <= required_score:
-        return True, (
-            f"Beats current SOTA by {current_score - new_score:.2f}g "
-            f"(required {required_improvement:.2f}g, {threshold_pct * 100:.1f}%)"
+    if direction == "maximize":
+        required_score = current_score + required_improvement
+        if new_score >= required_score:
+            return True, (
+                f"Beats current SOTA by {new_score - current_score:.4f} "
+                f"(required {required_improvement:.4f}, {threshold_pct * 100:.1f}%)"
+            )
+        shortfall = required_score - new_score
+        return False, (
+            f"Needs to beat current SOTA by {required_improvement:.4f} "
+            f"({threshold_pct * 100:.1f}%); short by {shortfall:.4f}"
         )
 
+    # minimize
+    required_score = current_score - required_improvement
+    if new_score <= required_score:
+        return True, (
+            f"Beats current SOTA by {current_score - new_score:.4f} "
+            f"(required {required_improvement:.4f}, {threshold_pct * 100:.1f}%)"
+        )
     shortfall = new_score - required_score
     return False, (
-        f"Needs to beat current SOTA by {required_improvement:.2f}g "
-        f"({threshold_pct * 100:.1f}%); short by {shortfall:.2f}g"
+        f"Needs to beat current SOTA by {required_improvement:.4f} "
+        f"({threshold_pct * 100:.1f}%); short by {shortfall:.4f}"
     )

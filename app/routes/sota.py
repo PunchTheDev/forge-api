@@ -38,13 +38,13 @@ async def get_sota_eligibility(spec_id: str, score: float = Query(...)):
 
     age_days = (datetime.now(timezone.utc) - record.submitted_at.replace(tzinfo=timezone.utc)).total_seconds() / 86400
     threshold_pct = sota_margin_threshold(age_days)
-    required_improvement = record.score_grams * threshold_pct
-    eligible, reason = sota_eligible(score, record.score_grams, age_days)
+    required_improvement = abs(record.score) * threshold_pct
+    eligible, reason = sota_eligible(score, record.score, age_days, record.score_direction)
 
     return SotaEligibility(
         eligible=eligible,
         required_improvement_pct=threshold_pct * 100,
-        current_score=record.score_grams,
+        current_score=record.score,
         margin_grams=required_improvement,
         reason=reason,
     )
