@@ -11,6 +11,7 @@ from app.models import (
     OverallLeaderboard,
     OverallLeaderboardEntry,
 )
+from app.routes.rounds import _load_rounds
 
 router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
 
@@ -24,15 +25,20 @@ async def get_overall_leaderboard():
     Only specs with at least one passing submission contribute.
     Contributors are ranked by their mean normalized score (lower is better).
     """
+    # Only rank against active-round specs; legacy seed specs are excluded.
+    active_rounds = [r for r in _load_rounds() if r.status == "active"]
+    active_spec_ids = {s.id for r in active_rounds for s in r.specs}
+
     all_specs = spec_store.load_all()
-    total_specs = len(all_specs)
-    baseline_by_spec = {s.id: s.scoring.baseline_score for s in all_specs}
-    direction_by_spec = {s.id: s.scoring.direction for s in all_specs}
+    round_specs = [s for s in all_specs if s.id in active_spec_ids]
+    total_specs = len(round_specs)
+    baseline_by_spec = {s.id: s.scoring.baseline_score for s in round_specs}
+    direction_by_spec = {s.id: s.scoring.direction for s in round_specs}
 
     # Per-spec best per contributor, direction-aware.
     per_spec_rows: dict[str, list] = {}
     async with get_db() as db:
-        for spec in all_specs:
+        for spec in round_specs:
             direction = spec.scoring.direction
             if direction == "maximize":
                 best_agg = "MAX(COALESCE(score, mass_grams))"
