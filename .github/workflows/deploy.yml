@@ -1,0 +1,39 @@
+name: Deploy to ventura-nanoclaw
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Skips silently when SERVER_SSH_KEY is not set.
+    if: ${{ secrets.SERVER_SSH_KEY != '' }}
+    timeout-minutes: 15
+
+    steps:
+      - name: Set up SSH
+        env:
+          SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ vars.SERVER_HOST || '143.244.191.193' }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy
+        env:
+          SERVER: ${{ vars.SERVER_USER || 'root' }}@${{ vars.SERVER_HOST || '143.244.191.193' }}
+          API_DIR: ${{ vars.SERVER_FORGE_API_DIR || '/root/forge-api' }}
+          FORGE_DIR: ${{ vars.SERVER_FORGE_DIR || '/root/forge' }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no "$SERVER" \
+            "set -euo pipefail
+             [ -d '$API_DIR' ]   || git clone https://github.com/PunchTheDev/forge-api '$API_DIR'
+             [ -d '$FORGE_DIR' ] || git clone https://github.com/PunchTheDev/forge '$FORGE_DIR'
+             cd '$API_DIR'   && git fetch origin main && git reset --hard origin/main
+             cd '$FORGE_DIR' && git fetch origin main && git reset --hard origin/main
+             mkdir -p '$API_DIR/data/specs'
+             cp -r '$FORGE_DIR/specs/'* '$API_DIR/data/specs/'
+             pm2 restart forge-api
+             curl -sf http://localhost:8000/health || echo '(health endpoint not found)'"
