@@ -60,9 +60,7 @@ async def init_db() -> None:
     os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(CREATE_SUBMISSIONS)
-        for idx in CREATE_INDEXES:
-            await db.execute(idx)
-        # Migrate existing DBs that predate various columns.
+        # Migrate existing DBs that predate various columns — must run before indexes.
         async with db.execute("PRAGMA table_info(submissions)") as cur:
             cols = {row[1] async for row in cur}
         if "step_data" not in cols:
@@ -75,6 +73,9 @@ async def init_db() -> None:
             await db.execute(MIGRATE_ADD_SCORE_METRIC)
         if "score_direction" not in cols:
             await db.execute(MIGRATE_ADD_SCORE_DIRECTION)
+        # Indexes — run after migrations so all columns exist.
+        for idx in CREATE_INDEXES:
+            await db.execute(idx)
         # Backfill score/score_metric/score_direction for rows created before multi-objective support.
         await db.execute(
             "UPDATE submissions SET score = mass_grams, score_metric = 'mass_grams' WHERE score IS NULL"
