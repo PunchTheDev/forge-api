@@ -1,10 +1,95 @@
+from collections import defaultdict
+
 from fastapi import APIRouter, HTTPException
 
 from app import specs as spec_store
 from app.db import get_db
-from app.models import Leaderboard, LeaderboardEntry
+from app.models import (
+    Leaderboard,
+    LeaderboardEntry,
+    OverallBestEntry,
+    OverallLeaderboard,
+    OverallLeaderboardEntry,
+)
 
 router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
+
+
+@router.get("/overall", response_model=OverallLeaderboard)
+async def get_overall_leaderboard():
+    """Cross-spec leaderboard: ranks contributors by average normalized score.
+
+    Normalized score = best_mass / baseline_mass for each spec.
+    Lower is better. Only specs with at least one passing submission contribute.
+    Contributors are ranked by their mean normalized score across entered specs.
+    """
+    all_specs = spec_store.load_all()
+    total_specs = len(all_specs)
+    baseline_by_spec = {s.id: s.scoring.baseline_mass_grams for s in all_specs}
+
+    # Per-spec ranked leaderboard rows: (spec_id, rank, contributor, mass_grams, submission_id, submitted_at)
+    per_spec_rows: dict[str, list] = {}
+    async with get_db() as db:
+        for spec in all_specs:
+            query = """
+                SELECT s.id as submission_id, s.contributor,
+                       s.mass_grams, s.submitted_at
+                FROM submissions s
+                INNER JOIN (
+                    SELECT contributor, MIN(mass_grams) as min_mass
+                    FROM submissions
+                    WHERE spec_id = ? AND passed = 1
+                    GROUP BY contributor
+                ) best ON s.contributor = best.contributor
+                       AND s.mass_grams = best.min_mass
+                       AND s.spec_id = ?
+                       AND s.passed = 1
+                ORDER BY s.mass_grams ASC
+            """
+            async with db.execute(query, (spec.id, spec.id)) as cur:
+                per_spec_rows[spec.id] = await cur.fetchall()
+
+    # Aggregate per contributor
+    contrib_bests: dict[str, list[OverallBestEntry]] = defaultdict(list)
+    for spec_id, rows in per_spec_rows.items():
+        baseline = baseline_by_spec.get(spec_id, 1.0)
+        for rank_idx, row in enumerate(rows):
+            contrib_bests[row["contributor"]].append(
+                OverallBestEntry(
+                    spec_id=spec_id,
+                    rank=rank_idx + 1,
+                    mass_grams=row["mass_grams"],
+                    normalized_score=row["mass_grams"] / baseline if baseline else 1.0,
+                    submission_id=row["submission_id"],
+                    submitted_at=row["submitted_at"],
+                )
+            )
+
+    if not contrib_bests:
+        return OverallLeaderboard(total_specs=total_specs, entries=[])
+
+    entries: list[OverallLeaderboardEntry] = []
+    for contributor, bests in contrib_bests.items():
+        specs_entered = len(bests)
+        total_wins = sum(1 for b in bests if b.rank == 1)
+        avg_norm = sum(b.normalized_score for b in bests) / specs_entered
+        entries.append(
+            OverallLeaderboardEntry(
+                rank=0,  # filled below after sort
+                contributor=contributor,
+                specs_entered=specs_entered,
+                total_wins=total_wins,
+                avg_normalized_score=round(avg_norm, 6),
+                best=sorted(bests, key=lambda b: b.spec_id),
+            )
+        )
+
+    # Primary sort: avg_normalized_score ASC; tiebreak: specs_entered DESC (more breadth wins ties)
+    entries.sort(key=lambda e: (e.avg_normalized_score, -e.specs_entered))
+    for i, entry in enumerate(entries):
+        entry.rank = i + 1
+
+    return OverallLeaderboard(total_specs=total_specs, entries=entries)
 
 
 @router.get("", response_model=list[Leaderboard])
