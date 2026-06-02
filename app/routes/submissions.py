@@ -8,6 +8,7 @@ from fastapi.responses import Response
 
 from app.db import get_db
 from app.models import Submission, SubmissionCreate
+from app.scoring import sota_eligible as compute_sota_eligible
 
 router = APIRouter(prefix="/submissions", tags=["submissions"])
 admin_router = APIRouter(prefix="/admin/submissions", tags=["admin"])
@@ -21,6 +22,9 @@ async def create_submission(body: SubmissionCreate):
     now = datetime.now(timezone.utc).isoformat()
     today = now[:10]  # "YYYY-MM-DD"
     step_data = base64.b64decode(body.step_b64) if body.step_b64 else None
+
+    # Compute SOTA eligibility before inserting so we can store it.
+    eligible = await _compute_eligibility(body.spec_id, body.mass_grams)
 
     async with get_db() as db:
         async with db.execute(
@@ -37,8 +41,8 @@ async def create_submission(body: SubmissionCreate):
         await db.execute(
             """INSERT INTO submissions
                (id, spec_id, agent_path, contributor, commit_hash, mass_grams,
-                fea_stress_mpa, fea_allowable_mpa, passed, pr_number, notes, submitted_at, step_data)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                fea_stress_mpa, fea_allowable_mpa, passed, pr_number, notes, submitted_at, step_data, sota_eligible)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 sub_id,
                 body.spec_id,
@@ -53,11 +57,12 @@ async def create_submission(body: SubmissionCreate):
                 body.notes,
                 now,
                 step_data,
+                int(eligible),
             ),
         )
         await db.commit()
 
-    return _build_submission(sub_id, now, body, step_data is not None)
+    return _build_submission(sub_id, now, body, step_data is not None, eligible)
 
 
 @router.get("", response_model=list[Submission])
@@ -188,7 +193,30 @@ async def get_submission_step(submission_id: str):
     )
 
 
+async def _compute_eligibility(spec_id: str, mass_grams: float) -> bool:
+    """Look up the current SOTA and determine if mass_grams is SOTA-eligible."""
+    query = """
+        SELECT mass_grams, submitted_at FROM submissions
+        WHERE spec_id = ? AND passed = 1
+        ORDER BY mass_grams ASC
+        LIMIT 1
+    """
+    async with get_db() as db:
+        async with db.execute(query, (spec_id,)) as cur:
+            row = await cur.fetchone()
+
+    if row is None:
+        return True  # No existing SOTA — always eligible.
+
+    current_score = row["mass_grams"]
+    sota_at = datetime.fromisoformat(row["submitted_at"]).replace(tzinfo=timezone.utc)
+    age_days = (datetime.now(timezone.utc) - sota_at).total_seconds() / 86400
+    eligible, _ = compute_sota_eligible(mass_grams, current_score, age_days)
+    return eligible
+
+
 def _row_to_submission(row) -> Submission:
+    raw_eligible = row["sota_eligible"]
     return Submission(
         id=uuid.UUID(row["id"]),
         spec_id=row["spec_id"],
@@ -203,10 +231,11 @@ def _row_to_submission(row) -> Submission:
         notes=row["notes"],
         submitted_at=datetime.fromisoformat(row["submitted_at"]),
         has_step=row["step_data"] is not None,
+        sota_eligible=bool(raw_eligible) if raw_eligible is not None else None,
     )
 
 
-def _build_submission(sub_id: str, now: str, body: SubmissionCreate, has_step: bool) -> Submission:
+def _build_submission(sub_id: str, now: str, body: SubmissionCreate, has_step: bool, eligible: bool) -> Submission:
     return Submission(
         id=uuid.UUID(sub_id),
         spec_id=body.spec_id,
@@ -221,4 +250,5 @@ def _build_submission(sub_id: str, now: str, body: SubmissionCreate, has_step: b
         notes=body.notes,
         submitted_at=datetime.fromisoformat(now),
         has_step=has_step,
+        sota_eligible=eligible,
     )

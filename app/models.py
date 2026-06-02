@@ -64,6 +64,7 @@ class Submission(BaseModel):
     notes: str | None = None
     submitted_at: datetime
     has_step: bool = False
+    sota_eligible: bool | None = None
 
     model_config = {"from_attributes": True}
 
@@ -109,6 +110,14 @@ class OverallLeaderboardEntry(BaseModel):
 class OverallLeaderboard(BaseModel):
     total_specs: int
     entries: list[OverallLeaderboardEntry]
+
+
+class SotaEligibility(BaseModel):
+    eligible: bool
+    required_improvement_pct: float
+    current_score: float
+    margin_grams: float
+    reason: str
 
 
 class SotaRecord(BaseModel):
