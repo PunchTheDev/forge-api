@@ -48,6 +48,7 @@ async def create_submission(body: SubmissionCreate):
 async def list_submissions(
     spec_id: str | None = Query(None),
     contributor: str | None = Query(None),
+    commit_hash: str | None = Query(None),
     passed_only: bool = Query(True),
     limit: int = Query(50, le=500),
 ):
@@ -60,6 +61,9 @@ async def list_submissions(
     if contributor:
         conditions.append("contributor = ?")
         params.append(contributor)
+    if commit_hash:
+        conditions.append("commit_hash = ?")
+        params.append(commit_hash)
     if passed_only:
         conditions.append("passed = 1")
 

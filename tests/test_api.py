@@ -142,3 +142,24 @@ def test_submission_step_404_no_step(client: TestClient):
 def test_submission_step_404_missing_id(client: TestClient):
     r = client.get("/submissions/00000000-0000-0000-0000-000000000000/step")
     assert r.status_code == 404
+
+
+def test_list_submissions_filter_commit_hash(client: TestClient):
+    client.post("/submissions", json=GOOD_SUBMISSION)
+    other = {**GOOD_SUBMISSION, "commit_hash": "deadbeef", "contributor": "other"}
+    client.post("/submissions", json=other)
+
+    r = client.get("/submissions?commit_hash=abc1234&passed_only=false")
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) == 1
+    assert data[0]["commit_hash"] == "abc1234"
+
+    r2 = client.get("/submissions?commit_hash=deadbeef&passed_only=false")
+    assert r2.status_code == 200
+    assert len(r2.json()) == 1
+    assert r2.json()[0]["commit_hash"] == "deadbeef"
+
+    r3 = client.get("/submissions?commit_hash=notexist&passed_only=false")
+    assert r3.status_code == 200
+    assert r3.json() == []
