@@ -144,9 +144,10 @@ def _build_docker_cmd(tmpdir: str) -> list[str]:
     model = os.environ.get("FORGE_MODEL")
     if model:
         cmd += ["-e", f"FORGE_MODEL={model}"]
+    # The forge-eval image ENTRYPOINT is already `python3 -m benchmark.evaluate`.
+    # Pass only the args — not the entrypoint again.
     cmd += [
         FORGE_EVAL_IMAGE,
-        "python3", "-m", "benchmark.evaluate",
         "--agent", "/preview/agent.py",
         "--spec", "/preview/spec.json",
         "--json-compact",
