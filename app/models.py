@@ -51,6 +51,7 @@ class SubmissionCreate(BaseModel):
     # Generic score for multi-objective benchmarks; defaults to mass_grams when absent.
     score: float | None = None
     score_metric: str = "mass_grams"
+    score_direction: Literal["minimize", "maximize"] = "minimize"
 
 
 class Submission(BaseModel):
@@ -70,6 +71,7 @@ class Submission(BaseModel):
     sota_eligible: bool | None = None
     score: float | None = None
     score_metric: str = "mass_grams"
+    score_direction: str = "minimize"
 
     model_config = {"from_attributes": True}
 
@@ -130,6 +132,7 @@ class SotaRecord(BaseModel):
     score_grams: float  # kept for backward compat — equals score when metric is mass_grams
     score: float
     score_metric: str
+    score_direction: str  # "minimize" or "maximize"
     agent: str
     contributor: str
     fea_stress_mpa: float

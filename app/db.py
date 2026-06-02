@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS submissions (
     submitted_at TEXT NOT NULL,
     step_data   BLOB,
     score       REAL,
-    score_metric TEXT
+    score_metric TEXT,
+    score_direction TEXT DEFAULT 'minimize'
 )
 """
 
@@ -41,6 +42,10 @@ ALTER TABLE submissions ADD COLUMN score REAL
 
 MIGRATE_ADD_SCORE_METRIC = """
 ALTER TABLE submissions ADD COLUMN score_metric TEXT
+"""
+
+MIGRATE_ADD_SCORE_DIRECTION = """
+ALTER TABLE submissions ADD COLUMN score_direction TEXT DEFAULT 'minimize'
 """
 
 CREATE_INDEXES = [
@@ -68,9 +73,14 @@ async def init_db() -> None:
             await db.execute(MIGRATE_ADD_SCORE)
         if "score_metric" not in cols:
             await db.execute(MIGRATE_ADD_SCORE_METRIC)
-        # Backfill score/score_metric for rows created before multi-objective support.
+        if "score_direction" not in cols:
+            await db.execute(MIGRATE_ADD_SCORE_DIRECTION)
+        # Backfill score/score_metric/score_direction for rows created before multi-objective support.
         await db.execute(
             "UPDATE submissions SET score = mass_grams, score_metric = 'mass_grams' WHERE score IS NULL"
+        )
+        await db.execute(
+            "UPDATE submissions SET score_direction = 'minimize' WHERE score_direction IS NULL"
         )
 
         # Data correction: thin-frame submission (7450daa) claimed 27g but fails

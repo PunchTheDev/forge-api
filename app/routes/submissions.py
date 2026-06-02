@@ -43,8 +43,8 @@ async def create_submission(body: SubmissionCreate):
             """INSERT INTO submissions
                (id, spec_id, agent_path, contributor, commit_hash, mass_grams,
                 fea_stress_mpa, fea_allowable_mpa, passed, pr_number, notes, submitted_at, step_data,
-                sota_eligible, score, score_metric)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                sota_eligible, score, score_metric, score_direction)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 sub_id,
                 body.spec_id,
@@ -62,6 +62,7 @@ async def create_submission(body: SubmissionCreate):
                 int(eligible),
                 score,
                 body.score_metric,
+                body.score_direction,
             ),
         )
         await db.commit()
@@ -239,6 +240,7 @@ def _row_to_submission(row) -> Submission:
         sota_eligible=bool(raw_eligible) if raw_eligible is not None else None,
         score=raw_score if raw_score is not None else row["mass_grams"],
         score_metric=row["score_metric"] or "mass_grams",
+        score_direction=row["score_direction"] or "minimize",
     )
 
 
@@ -260,4 +262,5 @@ def _build_submission(sub_id: str, now: str, body: SubmissionCreate, has_step: b
         sota_eligible=eligible,
         score=score,
         score_metric=body.score_metric,
+        score_direction=body.score_direction,
     )
