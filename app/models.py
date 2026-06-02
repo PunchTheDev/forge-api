@@ -86,6 +86,31 @@ class Leaderboard(BaseModel):
     entries: list[LeaderboardEntry]
 
 
+class OverallBestEntry(BaseModel):
+    """A contributor's best result on a single spec, used in the overall leaderboard."""
+
+    spec_id: str
+    rank: int
+    mass_grams: float
+    normalized_score: float  # mass_grams / baseline_mass_grams
+    submission_id: str
+    submitted_at: datetime
+
+
+class OverallLeaderboardEntry(BaseModel):
+    rank: int
+    contributor: str
+    specs_entered: int
+    total_wins: int  # number of specs where this contributor holds rank 1
+    avg_normalized_score: float  # mean(mass / baseline) across entered specs, lower is better
+    best: list[OverallBestEntry]
+
+
+class OverallLeaderboard(BaseModel):
+    total_specs: int
+    entries: list[OverallLeaderboardEntry]
+
+
 class SotaRecord(BaseModel):
     spec_id: str
     score_grams: float
