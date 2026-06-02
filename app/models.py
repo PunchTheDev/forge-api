@@ -129,6 +129,8 @@ class SotaEligibility(BaseModel):
 
 class SotaRecord(BaseModel):
     spec_id: str
+    submission_id: str  # UUID of the SOTA submission — use with GET /submissions/{id}/step for 3D viewer
+    has_step: bool = False  # true if a STEP file is stored for this submission
     score_grams: float  # kept for backward compat — equals score when metric is mass_grams
     score: float
     score_metric: str

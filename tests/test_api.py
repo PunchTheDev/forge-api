@@ -95,12 +95,15 @@ def test_sota_no_submissions(client: TestClient):
 
 
 def test_sota_with_submission(client: TestClient):
-    client.post("/submissions", json=GOOD_SUBMISSION)
+    sub = client.post("/submissions", json=GOOD_SUBMISSION)
     r = client.get("/sota/001_bracket")
     assert r.status_code == 200
     sota = r.json()
     assert sota["score_grams"] == 108.48
     assert sota["contributor"] == "TestMiner"
+    assert "submission_id" in sota
+    assert sota["submission_id"] == sub.json()["id"]
+    assert "has_step" in sota
 
 
 def test_sota_best_wins(client: TestClient):
