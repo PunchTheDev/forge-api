@@ -87,7 +87,7 @@ async def _get_sota(spec_id: str) -> SotaRecord | None:
     return SotaRecord(
         spec_id=row["spec_id"],
         submission_id=str(row["id"]),
-        has_step=bool(row["step_bytes"]) if "step_bytes" in row.keys() else False,
+        has_step=bool(row["step_data"]) if "step_data" in row.keys() else False,
         score_grams=row["mass_grams"],
         score=score,
         score_metric=score_metric,
