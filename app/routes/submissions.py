@@ -38,11 +38,13 @@ async def create_submission(body: SubmissionCreate):
                 status_code=429,
                 detail=f"Rate limit exceeded: {MAX_EVALS_PER_DAY} submissions per contributor per UTC day.",
             )
+        score = body.score if body.score is not None else body.mass_grams
         await db.execute(
             """INSERT INTO submissions
                (id, spec_id, agent_path, contributor, commit_hash, mass_grams,
-                fea_stress_mpa, fea_allowable_mpa, passed, pr_number, notes, submitted_at, step_data, sota_eligible)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                fea_stress_mpa, fea_allowable_mpa, passed, pr_number, notes, submitted_at, step_data,
+                sota_eligible, score, score_metric)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 sub_id,
                 body.spec_id,
@@ -58,11 +60,13 @@ async def create_submission(body: SubmissionCreate):
                 now,
                 step_data,
                 int(eligible),
+                score,
+                body.score_metric,
             ),
         )
         await db.commit()
 
-    return _build_submission(sub_id, now, body, step_data is not None, eligible)
+    return _build_submission(sub_id, now, body, step_data is not None, eligible, score)
 
 
 @router.get("", response_model=list[Submission])
@@ -217,6 +221,7 @@ async def _compute_eligibility(spec_id: str, mass_grams: float) -> bool:
 
 def _row_to_submission(row) -> Submission:
     raw_eligible = row["sota_eligible"]
+    raw_score = row["score"]
     return Submission(
         id=uuid.UUID(row["id"]),
         spec_id=row["spec_id"],
@@ -232,10 +237,12 @@ def _row_to_submission(row) -> Submission:
         submitted_at=datetime.fromisoformat(row["submitted_at"]),
         has_step=row["step_data"] is not None,
         sota_eligible=bool(raw_eligible) if raw_eligible is not None else None,
+        score=raw_score if raw_score is not None else row["mass_grams"],
+        score_metric=row["score_metric"] or "mass_grams",
     )
 
 
-def _build_submission(sub_id: str, now: str, body: SubmissionCreate, has_step: bool, eligible: bool) -> Submission:
+def _build_submission(sub_id: str, now: str, body: SubmissionCreate, has_step: bool, eligible: bool, score: float) -> Submission:
     return Submission(
         id=uuid.UUID(sub_id),
         spec_id=body.spec_id,
@@ -251,4 +258,6 @@ def _build_submission(sub_id: str, now: str, body: SubmissionCreate, has_step: b
         submitted_at=datetime.fromisoformat(now),
         has_step=has_step,
         sota_eligible=eligible,
+        score=score,
+        score_metric=body.score_metric,
     )

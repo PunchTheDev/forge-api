@@ -48,6 +48,9 @@ class SubmissionCreate(BaseModel):
     notes: str | None = None
     # Base64-encoded STEP bytes; stored server-side, not echoed back in responses.
     step_b64: str | None = None
+    # Generic score for multi-objective benchmarks; defaults to mass_grams when absent.
+    score: float | None = None
+    score_metric: str = "mass_grams"
 
 
 class Submission(BaseModel):
@@ -65,6 +68,8 @@ class Submission(BaseModel):
     submitted_at: datetime
     has_step: bool = False
     sota_eligible: bool | None = None
+    score: float | None = None
+    score_metric: str = "mass_grams"
 
     model_config = {"from_attributes": True}
 
@@ -122,7 +127,9 @@ class SotaEligibility(BaseModel):
 
 class SotaRecord(BaseModel):
     spec_id: str
-    score_grams: float
+    score_grams: float  # kept for backward compat — equals score when metric is mass_grams
+    score: float
+    score_metric: str
     agent: str
     contributor: str
     fea_stress_mpa: float

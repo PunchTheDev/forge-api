@@ -61,10 +61,12 @@ async def get_sota(spec_id: str):
 
 
 async def _get_sota(spec_id: str) -> SotaRecord | None:
+    # Order by score (multi-objective) with mass_grams fallback for pre-migration rows.
+    # All current metrics are "minimize", so ASC is correct.
     query = """
         SELECT * FROM submissions
         WHERE spec_id = ? AND passed = 1
-        ORDER BY mass_grams ASC
+        ORDER BY COALESCE(score, mass_grams) ASC
         LIMIT 1
     """
     async with get_db() as db:
@@ -74,9 +76,14 @@ async def _get_sota(spec_id: str) -> SotaRecord | None:
     if row is None:
         return None
 
+    raw_score = row["score"]
+    score = raw_score if raw_score is not None else row["mass_grams"]
+    score_metric = row["score_metric"] or "mass_grams"
     return SotaRecord(
         spec_id=row["spec_id"],
         score_grams=row["mass_grams"],
+        score=score,
+        score_metric=score_metric,
         agent=row["agent_path"],
         contributor=row["contributor"],
         fea_stress_mpa=row["fea_stress_mpa"],
