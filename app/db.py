@@ -29,6 +29,10 @@ MIGRATE_ADD_STEP_DATA = """
 ALTER TABLE submissions ADD COLUMN step_data BLOB
 """
 
+MIGRATE_ADD_SOTA_ELIGIBLE = """
+ALTER TABLE submissions ADD COLUMN sota_eligible INTEGER
+"""
+
 CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_submissions_spec ON submissions(spec_id)",
     "CREATE INDEX IF NOT EXISTS idx_submissions_contributor ON submissions(contributor)",
@@ -47,6 +51,8 @@ async def init_db() -> None:
             cols = {row[1] async for row in cur}
         if "step_data" not in cols:
             await db.execute(MIGRATE_ADD_STEP_DATA)
+        if "sota_eligible" not in cols:
+            await db.execute(MIGRATE_ADD_SOTA_ELIGIBLE)
 
         # Data correction: thin-frame submission (7450daa) claimed 27g but fails
         # FEA at 60.3 MPa > 25.0 MPa allowable (1.2mm plate insufficient at bolt holes).
