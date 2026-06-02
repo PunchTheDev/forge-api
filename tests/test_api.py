@@ -163,3 +163,49 @@ def test_list_submissions_filter_commit_hash(client: TestClient):
     r3 = client.get("/submissions?commit_hash=notexist&passed_only=false")
     assert r3.status_code == 200
     assert r3.json() == []
+
+
+# --- Rate limiting ---
+
+def test_rate_limit_allows_under_cap(client: TestClient, monkeypatch):
+    monkeypatch.setenv("MAX_EVALS_PER_DAY", "3")
+    import importlib
+    import app.routes.submissions as sub_mod
+    importlib.reload(sub_mod)
+    for i in range(3):
+        sub = {**GOOD_SUBMISSION, "commit_hash": f"hash{i}"}
+        r = client.post("/submissions", json=sub)
+        assert r.status_code == 201
+
+
+def test_rate_limit_blocks_at_cap(client: TestClient, monkeypatch):
+    monkeypatch.setenv("MAX_EVALS_PER_DAY", "2")
+    import importlib
+    import app.routes.submissions as sub_mod
+    importlib.reload(sub_mod)
+    for i in range(2):
+        client.post("/submissions", json={**GOOD_SUBMISSION, "commit_hash": f"ok{i}"})
+    r = client.post("/submissions", json={**GOOD_SUBMISSION, "commit_hash": "blocked"})
+    assert r.status_code == 429
+    assert "Rate limit exceeded" in r.json()["detail"]
+
+
+def test_rate_limit_independent_per_contributor(client: TestClient, monkeypatch):
+    monkeypatch.setenv("MAX_EVALS_PER_DAY", "1")
+    import importlib
+    import app.routes.submissions as sub_mod
+    importlib.reload(sub_mod)
+    r1 = client.post("/submissions", json={**GOOD_SUBMISSION, "contributor": "AliceBot"})
+    assert r1.status_code == 201
+    r2 = client.post("/submissions", json={**GOOD_SUBMISSION, "contributor": "BobBot"})
+    assert r2.status_code == 201
+    r3 = client.post("/submissions", json={**GOOD_SUBMISSION, "contributor": "AliceBot", "commit_hash": "abc2"})
+    assert r3.status_code == 429
+
+
+def test_rate_limit_default_is_20(client: TestClient, monkeypatch):
+    monkeypatch.delenv("MAX_EVALS_PER_DAY", raising=False)
+    import importlib
+    import app.routes.submissions as sub_mod
+    importlib.reload(sub_mod)
+    assert sub_mod.MAX_EVALS_PER_DAY == 20

@@ -1,4 +1,5 @@
 import base64
+import os
 import uuid
 from datetime import datetime, timezone
 
@@ -10,14 +11,28 @@ from app.models import Submission, SubmissionCreate
 
 router = APIRouter(prefix="/submissions", tags=["submissions"])
 
+MAX_EVALS_PER_DAY = int(os.environ.get("MAX_EVALS_PER_DAY", "20"))
+
 
 @router.post("", response_model=Submission, status_code=201)
 async def create_submission(body: SubmissionCreate):
     sub_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
+    today = now[:10]  # "YYYY-MM-DD"
     step_data = base64.b64decode(body.step_b64) if body.step_b64 else None
 
     async with get_db() as db:
+        async with db.execute(
+            "SELECT COUNT(*) FROM submissions WHERE contributor = ? AND submitted_at >= ?",
+            (body.contributor, today),
+        ) as cur:
+            row = await cur.fetchone()
+        count = row[0]
+        if count >= MAX_EVALS_PER_DAY:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Rate limit exceeded: {MAX_EVALS_PER_DAY} submissions per contributor per UTC day.",
+            )
         await db.execute(
             """INSERT INTO submissions
                (id, spec_id, agent_path, contributor, commit_hash, mass_grams,
