@@ -19,47 +19,63 @@ router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
 async def get_overall_leaderboard():
     """Cross-spec leaderboard: ranks contributors by average normalized score.
 
-    Normalized score = best_mass / baseline_mass for each spec.
-    Lower is better. Only specs with at least one passing submission contribute.
-    Contributors are ranked by their mean normalized score across entered specs.
+    Normalized score: for minimize metrics = score / baseline (lower is better, 1.0 = baseline).
+    For maximize metrics = baseline / score (lower is still better, consistent ranking direction).
+    Only specs with at least one passing submission contribute.
+    Contributors are ranked by their mean normalized score (lower is better).
     """
     all_specs = spec_store.load_all()
     total_specs = len(all_specs)
     baseline_by_spec = {s.id: s.scoring.baseline_mass_grams for s in all_specs}
+    direction_by_spec = {s.id: s.scoring.direction for s in all_specs}
 
-    # Per-spec ranked leaderboard rows: (spec_id, rank, contributor, mass_grams, submission_id, submitted_at)
+    # Per-spec best per contributor, direction-aware.
     per_spec_rows: dict[str, list] = {}
     async with get_db() as db:
         for spec in all_specs:
-            query = """
+            direction = spec.scoring.direction
+            if direction == "maximize":
+                best_agg = "MAX(COALESCE(score, mass_grams))"
+                order_clause = "COALESCE(s.score, s.mass_grams) DESC"
+            else:
+                best_agg = "MIN(COALESCE(score, mass_grams))"
+                order_clause = "COALESCE(s.score, s.mass_grams) ASC"
+            query = f"""
                 SELECT s.id as submission_id, s.contributor,
-                       s.mass_grams, s.submitted_at
+                       s.mass_grams, COALESCE(s.score, s.mass_grams) as score,
+                       s.submitted_at
                 FROM submissions s
                 INNER JOIN (
-                    SELECT contributor, MIN(mass_grams) as min_mass
+                    SELECT contributor, {best_agg} as best_score
                     FROM submissions
                     WHERE spec_id = ? AND passed = 1
                     GROUP BY contributor
                 ) best ON s.contributor = best.contributor
-                       AND s.mass_grams = best.min_mass
+                       AND COALESCE(s.score, s.mass_grams) = best.best_score
                        AND s.spec_id = ?
                        AND s.passed = 1
-                ORDER BY s.mass_grams ASC
+                ORDER BY {order_clause}
             """
             async with db.execute(query, (spec.id, spec.id)) as cur:
                 per_spec_rows[spec.id] = await cur.fetchall()
 
-    # Aggregate per contributor
+    # Aggregate per contributor. Normalize so lower is always better across metrics.
     contrib_bests: dict[str, list[OverallBestEntry]] = defaultdict(list)
     for spec_id, rows in per_spec_rows.items():
         baseline = baseline_by_spec.get(spec_id, 1.0)
+        direction = direction_by_spec.get(spec_id, "minimize")
         for rank_idx, row in enumerate(rows):
+            score = row["score"]
+            if direction == "maximize":
+                normalized = (baseline / score) if score else 1.0
+            else:
+                normalized = (score / baseline) if baseline else 1.0
             contrib_bests[row["contributor"]].append(
                 OverallBestEntry(
                     spec_id=spec_id,
                     rank=rank_idx + 1,
                     mass_grams=row["mass_grams"],
-                    normalized_score=row["mass_grams"] / baseline if baseline else 1.0,
+                    normalized_score=normalized,
                     submission_id=row["submission_id"],
                     submitted_at=row["submitted_at"],
                 )
@@ -106,25 +122,40 @@ async def get_leaderboard(spec_id: str):
 
 
 async def _build_leaderboard(spec_id: str) -> Leaderboard:
-    # Best submission per contributor: the row with minimum mass.
-    # Subquery finds the min-mass submission ID per contributor so we can
-    # return submission_id (for the STEP viewer) and has_step.
-    query = """
+    # Load spec to determine score direction.
+    spec = spec_store.load_one(spec_id)
+    direction = spec.scoring.direction if spec else "minimize"
+    metric = spec.scoring.metric if spec else "mass_grams"
+
+    # For each contributor, find their best submission using the spec's scoring direction.
+    # COALESCE(score, mass_grams) is the canonical score value for any metric.
+    # For maximize metrics we want MAX; for minimize we want MIN.
+    if direction == "maximize":
+        best_agg = "MAX(COALESCE(score, mass_grams))"
+        order_clause = "COALESCE(s.score, s.mass_grams) DESC"
+    else:
+        best_agg = "MIN(COALESCE(score, mass_grams))"
+        order_clause = "COALESCE(s.score, s.mass_grams) ASC"
+
+    query = f"""
         SELECT s.id as submission_id, s.contributor, s.agent_path,
-               s.mass_grams, s.fea_stress_mpa, s.commit_hash,
+               s.mass_grams, COALESCE(s.score, s.mass_grams) as score,
+               COALESCE(s.score_metric, 'mass_grams') as score_metric,
+               COALESCE(s.score_direction, 'minimize') as score_direction,
+               s.fea_stress_mpa, s.commit_hash,
                s.submitted_at, s.pr_number,
                (s.step_data IS NOT NULL) as has_step
         FROM submissions s
         INNER JOIN (
-            SELECT contributor, MIN(mass_grams) as min_mass
+            SELECT contributor, {best_agg} as best_score
             FROM submissions
             WHERE spec_id = ? AND passed = 1
             GROUP BY contributor
         ) best ON s.contributor = best.contributor
-               AND s.mass_grams = best.min_mass
+               AND COALESCE(s.score, s.mass_grams) = best.best_score
                AND s.spec_id = ?
                AND s.passed = 1
-        ORDER BY s.mass_grams ASC
+        ORDER BY {order_clause}
     """
     async with get_db() as db:
         async with db.execute(query, (spec_id, spec_id)) as cur:
@@ -137,6 +168,9 @@ async def _build_leaderboard(spec_id: str) -> Leaderboard:
             contributor=r["contributor"],
             agent_path=r["agent_path"],
             mass_grams=r["mass_grams"],
+            score=r["score"],
+            score_metric=r["score_metric"],
+            score_direction=r["score_direction"],
             fea_stress_mpa=r["fea_stress_mpa"],
             commit_hash=r["commit_hash"],
             submitted_at=r["submitted_at"],
