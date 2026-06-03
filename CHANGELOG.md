@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Eval preview container zombie on timeout + missing security flags** (PR #45, `app/routes/eval_preview.py`): `proc.kill()` terminated the `docker run` client but not the container — hung evals kept consuming 4 GB RAM + 2 CPUs until they finished. Named containers (uuid-based) + explicit `docker kill <name>` on timeout. Also added `--cap-drop ALL` and `--pids-limit 256` to match CI eval sandbox flags; `_build_docker_cmd` now takes `container_name` arg.
+
 ### Security
 - **Constant-time admin key comparison in hidden eval routes** (PR #42, `app/routes/hidden.py`): `_require_admin` now uses `hmac.compare_digest` and reads the key fresh per-request. Plain `!=` comparison (PR #41 fix to `submissions.py`) was not applied here.
 
