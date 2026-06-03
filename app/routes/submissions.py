@@ -8,6 +8,7 @@ from fastapi.responses import Response
 
 from app.db import get_db
 from app.models import Submission, SubmissionCreate
+from app.notify import send_sota_alert
 from app.scoring import sota_eligible as compute_sota_eligible
 
 router = APIRouter(prefix="/submissions", tags=["submissions"])
@@ -25,7 +26,7 @@ async def create_submission(body: SubmissionCreate):
 
     # Compute SOTA eligibility before inserting so we can store it.
     score_for_eligibility = body.score if body.score is not None else body.mass_grams
-    eligible = await _compute_eligibility(body.spec_id, score_for_eligibility, body.score_direction)
+    eligible, old_sota_score = await _compute_eligibility(body.spec_id, score_for_eligibility, body.score_direction)
 
     async with get_db() as db:
         async with db.execute(
@@ -67,6 +68,16 @@ async def create_submission(body: SubmissionCreate):
             ),
         )
         await db.commit()
+
+    if eligible and body.passed:
+        await send_sota_alert(
+            body.spec_id,
+            body.score_metric or "mass_grams",
+            body.score_direction or "minimize",
+            score,
+            old_sota_score,
+            body.contributor,
+        )
 
     return _build_submission(sub_id, now, body, step_data is not None, eligible, score)
 
@@ -199,11 +210,11 @@ async def get_submission_step(submission_id: str):
     )
 
 
-async def _compute_eligibility(spec_id: str, score: float, direction: str = "minimize") -> bool:
+async def _compute_eligibility(spec_id: str, score: float, direction: str = "minimize") -> tuple[bool, float | None]:
     """Look up the current SOTA and determine if score is SOTA-eligible.
 
-    Uses direction-aware ordering: for 'maximize' metrics the best SOTA has the
-    highest score; for 'minimize' metrics the best has the lowest.
+    Returns (eligible, current_sota_score). current_sota_score is None when no
+    passing submission exists yet (first submission is always eligible).
     """
     query = """
         SELECT COALESCE(score, mass_grams) AS best_score, submitted_at
@@ -221,13 +232,13 @@ async def _compute_eligibility(spec_id: str, score: float, direction: str = "min
             row = await cur.fetchone()
 
     if row is None:
-        return True  # No existing SOTA — always eligible.
+        return True, None  # No existing SOTA — always eligible.
 
-    current_score = row["best_score"]
+    current_score = float(row["best_score"])
     sota_at = datetime.fromisoformat(row["submitted_at"]).replace(tzinfo=timezone.utc)
     age_days = (datetime.now(timezone.utc) - sota_at).total_seconds() / 86400
     eligible, _ = compute_sota_eligible(score, current_score, age_days, direction)
-    return eligible
+    return eligible, current_score
 
 
 def _row_to_submission(row) -> Submission:
