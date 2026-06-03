@@ -4,6 +4,14 @@
 
 ---
 
+## [0.14.4] — 2026-06-03
+
+### Added
+- **`Spec.tier` computed field** (PR #64, `app/models.py`): derives difficulty tier (`"easy"` / `"medium"` / `"hard"`) from the spec ID suffix. Returns `null` for legacy specs without a tier suffix. Exposed in all spec responses.
+- **`GET /specs?tier=<easy|medium|hard>`** (PR #64, `app/routes/specs.py`): filter parameter scopes the spec list to one difficulty tier. Mirrors the `forge specs --tier` CLI flag. Test count: 96 → 102.
+
+---
+
 ## [0.14.3] — 2026-06-03
 
 ### Changed
