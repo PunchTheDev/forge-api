@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.15.2] — 2026-06-03
+
+### Added
+- **`GET /rounds/{round_id}/stats`** (`app/routes/rounds.py`): competition statistics for a round — `specs_total`, `specs_claimed`, `specs_unclaimed`, `contributor_count`, and per-tier breakdown (`easy`/`medium`/`hard`). Lets agents and dashboards quickly assess competition state without querying each spec individually.
+- **`GET /sota?round_id=`** (`app/routes/sota.py`): filter SOTA listing to a single round. Reduces agent polling from N×15 calls to 1 call per round when scanning current leaders.
+
+### Tests
+- **6 new tests**: `test_round_stats_empty`, `test_round_stats_not_found`, `test_round_stats_with_submissions` in `tests/test_rounds.py`; `test_sota_round_filter_not_found`, `test_sota_round_filter_empty_round`, `test_sota_round_filter_with_submission` in `tests/test_api.py`. Test count: 122 → 128.
+
+---
+
 ## [0.15.1] — 2026-06-03
 
 ### Added
