@@ -118,7 +118,7 @@ class OverallBestEntry(BaseModel):
     mass_grams: float
     score: float  # canonical score value for this spec's metric
     score_metric: str  # e.g. "mass_grams", "stiffness_to_weight", "deflection_mm"
-    normalized_score: float  # score / baseline_score (or baseline_score / score for maximize)
+    normalized_score: float  # rank / (N+1) where N = entries for this spec; 1.0 = not entered
     submission_id: str
     submitted_at: datetime
 
@@ -129,7 +129,7 @@ class OverallLeaderboardEntry(BaseModel):
     specs_entered: int
     total_wins: int  # number of specs where this contributor holds rank 1
     avg_rank: float  # mean rank position across entered specs (display only)
-    overall_score: float = 1.0  # mean normalized score across ALL active specs; < 1.0 = beating baseline; primary sort key
+    overall_score: float = 1.0  # mean rank-fraction across ALL active specs; 1.0 = not competing; lower = better
     best: list[OverallBestEntry]
 
 
