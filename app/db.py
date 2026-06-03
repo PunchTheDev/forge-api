@@ -1,7 +1,11 @@
 """SQLite database setup and connection management."""
 
+import base64
+import json
 import os
+import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 import aiosqlite
 
@@ -48,6 +52,32 @@ MIGRATE_ADD_SCORE_DIRECTION = """
 ALTER TABLE submissions ADD COLUMN score_direction TEXT DEFAULT 'minimize'
 """
 
+CREATE_HIDDEN_SPECS = """
+CREATE TABLE IF NOT EXISTS hidden_specs (
+    id          TEXT PRIMARY KEY,
+    round_id    TEXT NOT NULL,
+    tier        TEXT NOT NULL,
+    spec_json   TEXT NOT NULL,
+    created_at  TEXT NOT NULL
+)
+"""
+
+CREATE_HIDDEN_SUBMISSIONS = """
+CREATE TABLE IF NOT EXISTS hidden_submissions (
+    id          TEXT PRIMARY KEY,
+    spec_id     TEXT NOT NULL,
+    agent_path  TEXT NOT NULL,
+    contributor TEXT NOT NULL,
+    commit_hash TEXT NOT NULL,
+    score       REAL,
+    metric      TEXT,
+    direction   TEXT DEFAULT 'minimize',
+    passed      INTEGER NOT NULL,
+    notes       TEXT,
+    submitted_at TEXT NOT NULL
+)
+"""
+
 CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_submissions_spec ON submissions(spec_id)",
     "CREATE INDEX IF NOT EXISTS idx_submissions_contributor ON submissions(contributor)",
@@ -56,10 +86,36 @@ CREATE_INDEXES = [
 ]
 
 
+async def _seed_hidden_specs(db: aiosqlite.Connection) -> None:
+    """Seed hidden specs from HIDDEN_SPECS_JSON env var if the table is empty."""
+    payload = os.environ.get("HIDDEN_SPECS_JSON", "")
+    if not payload:
+        return
+    async with db.execute("SELECT COUNT(*) FROM hidden_specs") as cur:
+        row = await cur.fetchone()
+    if row[0] > 0:
+        return  # Already seeded — do not overwrite.
+    try:
+        specs = json.loads(base64.b64decode(payload).decode())
+    except Exception as exc:
+        print(f"[db] Warning: failed to decode HIDDEN_SPECS_JSON — {exc}")
+        return
+    now = datetime.now(timezone.utc).isoformat()
+    for spec in specs:
+        await db.execute(
+            "INSERT OR IGNORE INTO hidden_specs (id, round_id, tier, spec_json, created_at) VALUES (?,?,?,?,?)",
+            (spec["id"], spec.get("round_id", ""), spec.get("tier", ""), json.dumps(spec), now),
+        )
+    await db.commit()
+    print(f"[db] Seeded {len(specs)} hidden specs.")
+
+
 async def init_db() -> None:
     os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(CREATE_SUBMISSIONS)
+        await db.execute(CREATE_HIDDEN_SPECS)
+        await db.execute(CREATE_HIDDEN_SUBMISSIONS)
         # Migrate existing DBs that predate various columns — must run before indexes.
         async with db.execute("PRAGMA table_info(submissions)") as cur:
             cols = {row[1] async for row in cur}
@@ -93,6 +149,7 @@ async def init_db() -> None:
             "WHERE commit_hash = '7450daa' AND passed = 1"
         )
 
+        await _seed_hidden_specs(db)
         await db.commit()
 
 

@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import init_db
-from app.routes import eval_preview, health, leaderboard, rounds, sota, specs, submissions
+from app.routes import eval_preview, health, hidden, leaderboard, rounds, sota, specs, submissions
 from app.routes.submissions import admin_router
 
 
@@ -38,6 +38,7 @@ app.include_router(sota.router)
 app.include_router(eval_preview.router)
 app.include_router(rounds.router)
 app.include_router(health.router)
+app.include_router(hidden.router)
 
 
 @app.get("/health")
