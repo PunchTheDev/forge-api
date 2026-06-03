@@ -6,26 +6,65 @@ The API is the single source of truth for specs, submissions, leaderboard, and S
 
 ## Endpoints
 
+Interactive docs at `/docs` when running. Key routes:
+
+### Health
+
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/health` | Health check |
+| GET | `/health` | Liveness check |
+| GET | `/health/deep` | Deep check: DB, active rounds, spec count |
+
+### Specs & rounds
+
+| Method | Path | Description |
+|--------|------|-------------|
 | GET | `/specs` | List all problem specs |
 | GET | `/specs/{id}` | Get spec by ID |
+| GET | `/rounds` | List all rounds |
+| GET | `/rounds/active` | Active rounds only |
+| GET | `/rounds/{id}` | Round details with full spec list |
+
+### Submissions
+
+| Method | Path | Description |
+|--------|------|-------------|
 | POST | `/submissions` | Record a benchmark result |
 | GET | `/submissions` | List submissions (filterable by spec, contributor) |
 | GET | `/submissions/{id}` | Get submission by ID |
-| GET | `/leaderboard` | Full leaderboard (all specs) |
+| GET | `/submissions/{id}/step` | Download the submitted STEP file |
+
+### Leaderboard
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/leaderboard/overall` | Cross-spec overall ranking (active rounds only) |
+| GET | `/leaderboard` | Per-spec leaderboard entries |
 | GET | `/leaderboard/{spec_id}` | Leaderboard for one spec |
+
+### SOTA
+
+| Method | Path | Description |
+|--------|------|-------------|
 | GET | `/sota` | Current SOTA for all specs |
 | GET | `/sota/{spec_id}` | Current SOTA for one spec |
+| GET | `/sota/{spec_id}/history` | Progressive SOTA history (score improvements over time) |
 | GET | `/sota/{spec_id}/eligibility` | Check if a score beats SOTA (marginal-gain rule) |
-| POST | `/eval/preview` | Run a live sandboxed eval on submitted agent code |
-| GET | `/rounds` | List all competition rounds |
-| GET | `/rounds/active` | Active rounds only |
-| GET | `/rounds/{id}` | Round details with full spec list |
-| POST | `/admin/submissions/batch` | Batch-import submissions (admin only) |
 
-Interactive docs at `/docs` when running.
+### Eval preview
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/eval/preview` | Run a live sandboxed eval on submitted agent code (10/IP/day) |
+
+### Admin
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/admin/submissions/batch` | Batch-import submissions |
+| GET | `/admin/hidden/specs/{round_id}/sample` | Sample a random hidden eval spec (auth required) |
+| POST | `/admin/hidden/submissions` | Record a hidden eval result (auth required) |
+| GET | `/admin/hidden/submissions/{contributor}` | Review hidden eval history for a contributor |
 
 ### Marginal-gain rule
 
@@ -57,10 +96,9 @@ docker compose up
 
 ## Seeding data
 
-Copy specs from the forge repo and POST the initial SOTA:
+Copy specs from the forge repo and seed the database:
 
 ```bash
-SPECS_DIR=data/specs  # copy forge/specs/*.json here first
 python3 scripts/seed.py /path/to/forge
 ```
 
@@ -70,6 +108,12 @@ python3 scripts/seed.py /path/to/forge
 |----------|---------|-------------|
 | `DB_PATH` | `data/forge.db` | SQLite database path |
 | `SPECS_DIR` | `data/specs` | Directory of spec JSON files |
+| `MAX_EVALS_PER_DAY` | `20` | Per-contributor daily submission rate limit |
+| `DISCORD_WEBHOOK_URL` | — | Post SOTA notifications to Discord when set |
+| `FORGE_LLM_KEY` | — | OpenRouter key for live eval preview |
+| `FORGE_MODEL` | — | Model override for eval preview |
+| `FORGE_ADMIN_KEY` | — | Secret for admin and hidden eval endpoints |
+| `HIDDEN_SPECS_JSON` | — | Base64-encoded hidden spec set (from `scripts/generate_hidden_specs.py` in forge) |
 
 ## Tests
 
