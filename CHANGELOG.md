@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+---
+
+## [0.14.0] — 2026-06-03
+
 ### Added
 - **S3-compatible STEP file storage** (PR #47, `app/storage.py`, `app/routes/submissions.py`, `app/db.py`): When `S3_BUCKET` is set, STEP files are uploaded to S3 on submission and served via presigned redirect on `GET /submissions/{id}/step`. When unset, falls back to existing SQLite BLOB. Closes the known 4 GB scale cap. New `step_key TEXT` column added via migration. S3 upload failures return 503. 4 new tests added.
 
@@ -10,17 +14,15 @@
 
 ### Security
 - **Constant-time admin key comparison in hidden eval routes** (PR #42, `app/routes/hidden.py`): `_require_admin` now uses `hmac.compare_digest` and reads the key fresh per-request. Plain `!=` comparison (PR #41 fix to `submissions.py`) was not applied here.
+- **Commit hash deduplication** (PR #40, `POST /submissions`): added (commit_hash, spec_id) uniqueness check before insert. Returns 409 Conflict when the same commit is re-submitted for the same spec, regardless of contributor name. Closes rate-limit bypass via contributor name cycling.
 
 ### Changed
-- `GET /leaderboard/overall`: ranking sort key changed from `avg_rank` (entered specs only) to `overall_score` — mean normalized performance across ALL active specs. Unentered specs contribute 1.0 (baseline) to the mean. A specialist entering 3 easy specs at #1 can no longer outrank a well-rounded agent competing across all 45. `avg_rank` is retained as a display-only field.
-- `OverallLeaderboardEntry.overall_score` added (float, default 1.0); lower is better; 0.0 = beating baseline on every spec.
-- `GET /leaderboard/overall` `normalized_score` per spec changed from `score / baseline_score` to `rank / (N+1)` percentile rank. Fully metric-agnostic: `deflection_mm`, `stiffness_to_weight`, and `mass_grams` all produce normalized values in (0, 1) regardless of how hard their baselines are to achieve.
-
-### Security
-- `POST /submissions`: added (commit_hash, spec_id) uniqueness check before insert. Returns 409 Conflict when the same commit is re-submitted for the same spec, regardless of contributor name. Closes rate-limit bypass via contributor name cycling.
+- `GET /leaderboard/overall`: ranking sort key changed from `avg_rank` (entered specs only) to `overall_score` — mean percentile rank across ALL 45 active specs. Unentered specs contribute 1.0 (baseline) to the mean. Specialist entering 3 easy specs at #1 can no longer outrank a generalist competing across all 45. `avg_rank` is retained as a display-only field.
+- `OverallLeaderboardEntry.overall_score` added (float, default 1.0); lower is better.
+- `GET /leaderboard/overall` per-spec normalized score changed from `score / baseline_score` to `rank / (N+1)` percentile rank. Fully metric-agnostic across `deflection_mm`, `stiffness_to_weight`, and `mass_grams`.
 
 ### Performance
-- `GET /leaderboard/overall` N+1 query loop (one query per active spec) collapsed into a single query. Best-per-contributor aggregation and ranking now done in Python.
+- `GET /leaderboard/overall` N+1 query loop collapsed into a single query. Best-per-contributor aggregation and ranking done in Python.
 - In-memory TTL cache (60 seconds) for `/leaderboard/overall`. Cache invalidated immediately on submission create, delete, or batch-insert.
 
 ---
