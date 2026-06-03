@@ -4,6 +4,13 @@
 
 ---
 
+## 2026-06-03 (step 221)
+
+### Added
+- **Storage backend check in `/health/deep`** (PR #56, `app/routes/health.py`): health endpoint now reports storage backend and connectivity. When `S3_BUCKET` is set, performs `head_bucket` to verify S3 is reachable and reports `{"backend": "s3", "bucket": "..."}` — marks overall status `degraded` on error. When `S3_BUCKET` is unset, reports `{"backend": "sqlite_blob"}` (always ok). Useful for verifying S3 config when operator activates it. Test count: 94 → 96.
+
+---
+
 ## 2026-06-03 (step 220)
 
 ### Fixed
