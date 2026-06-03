@@ -4,6 +4,13 @@
 
 ---
 
+## [0.14.3] — 2026-06-03
+
+### Changed
+- **round_003 name** (`data/rounds/round_003.json`, PR #62): renamed from "Round 3 — Absolute Stiffness" to "Round 3 — Deflection". The metric is `deflection_mm` (minimize tip displacement); "absolute stiffness" was a misleading label that implied a different objective.
+
+---
+
 ## [0.14.2] — 2026-06-03
 
 ### Changed
