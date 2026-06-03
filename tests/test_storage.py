@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 BASE_SUB = {
-    "spec_id": "r01_001_easy",
+    "spec_id": "001_bracket",
     "agent_path": "agents/alice/agent.py",
     "contributor": "alice",
     "commit_hash": "abc123",
@@ -97,3 +97,19 @@ def test_s3_upload_failure_returns_503(client, monkeypatch):
         resp = client.post("/submissions", json=_payload())
         assert resp.status_code == 503
         assert "S3 unavailable" in resp.json()["detail"]
+
+
+def test_sota_has_step_true_when_step_key_set(client, monkeypatch):
+    """SOTA has_step is True when step is stored in S3 (step_key set, step_data NULL)."""
+    monkeypatch.setenv("S3_BUCKET", "test-bucket")
+
+    mock_upload = AsyncMock(return_value="steps/sota-uuid.step")
+    mock_presign = AsyncMock(return_value="https://s3.example.com/steps/sota-uuid.step?sig=y")
+
+    with patch("app.storage.upload", mock_upload), patch("app.storage.presign", mock_presign):
+        resp = client.post("/submissions", json=_payload())
+        assert resp.status_code == 201
+
+    sota = client.get("/sota/001_bracket")
+    assert sota.status_code == 200
+    assert sota.json()["has_step"] is True
