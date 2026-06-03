@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Security
+- **Constant-time admin key comparison in hidden eval routes** (PR #42, `app/routes/hidden.py`): `_require_admin` now uses `hmac.compare_digest` and reads the key fresh per-request. Plain `!=` comparison (PR #41 fix to `submissions.py`) was not applied here.
+
 ### Changed
 - `GET /leaderboard/overall`: ranking sort key changed from `avg_rank` (entered specs only) to `overall_score` — mean normalized performance across ALL active specs. Unentered specs contribute 1.0 (baseline) to the mean. A specialist entering 3 easy specs at #1 can no longer outrank a well-rounded agent competing across all 45. `avg_rank` is retained as a display-only field.
 - `OverallLeaderboardEntry.overall_score` added (float, default 1.0); lower is better; 0.0 = beating baseline on every spec.
