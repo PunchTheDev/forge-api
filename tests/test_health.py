@@ -108,3 +108,36 @@ def test_health_deep_empty_rounds(tmp_path, monkeypatch):
     body = r.json()
     assert body["status"] == "degraded"
     assert body["checks"]["rounds"]["status"] == "warn"
+
+
+def test_health_deep_storage_sqlite(deep_client, monkeypatch):
+    """Storage check reports sqlite_blob backend when S3_BUCKET is not set."""
+    monkeypatch.delenv("S3_BUCKET", raising=False)
+
+    import app.storage, app.routes.health
+    importlib.reload(app.storage)
+    importlib.reload(app.routes.health)
+
+    r = deep_client.get("/health/deep")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["checks"]["storage"]["status"] == "ok"
+    assert body["checks"]["storage"]["backend"] == "sqlite_blob"
+
+
+def test_health_deep_storage_s3_error(deep_client, monkeypatch):
+    """Storage check reports error when S3_BUCKET is set but bucket is unreachable."""
+    monkeypatch.setenv("S3_BUCKET", "nonexistent-test-bucket")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "test")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "test")
+
+    import app.storage, app.routes.health
+    importlib.reload(app.storage)
+    importlib.reload(app.routes.health)
+
+    r = deep_client.get("/health/deep")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["checks"]["storage"]["status"] == "error"
+    assert body["checks"]["storage"]["backend"] == "s3"
+    assert body["status"] == "degraded"
