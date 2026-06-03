@@ -4,6 +4,13 @@
 
 ---
 
+## 2026-06-03 (step 219)
+
+### Fixed
+- **SOTA `has_step` false negative with S3 storage** (PR #52, `app/routes/sota.py`): `GET /sota/{spec_id}` returned `has_step: false` for submissions whose STEP file was stored in S3 (`step_key` set, `step_data` NULL). The 3D viewer on the dashboard would silently fail to show the model for any SOTA submission after `S3_BUCKET` is activated. Fixed by checking `step_key` in addition to `step_data` in `_get_sota()`, matching the correct logic already present in `GET /submissions`. Added `test_sota_has_step_true_when_step_key_set` to cover this path. Test count: 92 → 93.
+
+---
+
 ## [0.14.0] — 2026-06-03
 
 ### Added
