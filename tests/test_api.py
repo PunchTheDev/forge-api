@@ -198,11 +198,13 @@ def test_rate_limit_independent_per_contributor(client: TestClient, monkeypatch)
     import importlib
     import app.routes.submissions as sub_mod
     importlib.reload(sub_mod)
-    r1 = client.post("/submissions", json={**GOOD_SUBMISSION, "contributor": "AliceBot"})
+    r1 = client.post("/submissions", json={**GOOD_SUBMISSION, "contributor": "AliceBot", "commit_hash": "alice1"})
     assert r1.status_code == 201
-    r2 = client.post("/submissions", json={**GOOD_SUBMISSION, "contributor": "BobBot"})
+    # Bob uses a different commit hash — same hash + spec would be rejected by dedup
+    r2 = client.post("/submissions", json={**GOOD_SUBMISSION, "contributor": "BobBot", "commit_hash": "bob1"})
     assert r2.status_code == 201
-    r3 = client.post("/submissions", json={**GOOD_SUBMISSION, "contributor": "AliceBot", "commit_hash": "abc2"})
+    # Alice's second submission on a new commit is blocked by her 1/day cap
+    r3 = client.post("/submissions", json={**GOOD_SUBMISSION, "contributor": "AliceBot", "commit_hash": "alice2"})
     assert r3.status_code == 429
 
 
@@ -212,6 +214,27 @@ def test_rate_limit_default_is_20(client: TestClient, monkeypatch):
     import app.routes.submissions as sub_mod
     importlib.reload(sub_mod)
     assert sub_mod.MAX_EVALS_PER_DAY == 20
+
+
+# --- commit hash deduplication ---
+
+def test_duplicate_commit_hash_rejected(client: TestClient):
+    """Same (commit_hash, spec_id) pair is rejected with 409 regardless of contributor."""
+    r1 = client.post("/submissions", json=GOOD_SUBMISSION)
+    assert r1.status_code == 201
+    # Same commit hash, same spec — different contributor → should still be rejected
+    r2 = client.post("/submissions", json={**GOOD_SUBMISSION, "contributor": "Attacker"})
+    assert r2.status_code == 409
+    assert "already scored" in r2.json()["detail"]
+
+
+def test_same_commit_different_specs_allowed(client: TestClient):
+    """Same commit hash is allowed across different specs."""
+    r1 = client.post("/submissions", json=GOOD_SUBMISSION)
+    assert r1.status_code == 201
+    # Same commit hash, different spec — should succeed
+    r2 = client.post("/submissions", json={**GOOD_SUBMISSION, "spec_id": "002_bracket_hard"})
+    assert r2.status_code == 201
 
 
 # --- score_direction ---
