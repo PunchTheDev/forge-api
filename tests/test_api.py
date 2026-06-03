@@ -1,3 +1,6 @@
+import base64
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -438,3 +441,77 @@ def test_hidden_submission_requires_auth(client: TestClient, monkeypatch):
         },
     )
     assert r.status_code == 503
+
+
+# --- hidden spec happy paths ---
+
+def _make_hidden_specs_env(specs: list) -> str:
+    """Encode a list of spec dicts as the HIDDEN_SPECS_JSON env var value."""
+    return base64.b64encode(json.dumps(specs).encode()).decode()
+
+
+def test_hidden_spec_returns_spec_with_valid_key(tmp_path, monkeypatch):
+    """GET /admin/hidden/specs/{round}/sample returns a spec when key and data are valid."""
+    spec = {
+        "id": "hidden_round_001_001_easy",
+        "round_id": "round_001",
+        "tier": "easy",
+        "material": "pla",
+        "constraints": {"load_newtons": 100.0},
+        "scoring": {"metric": "mass_grams", "direction": "minimize"},
+    }
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("SPECS_DIR", "tests/fixtures/specs")
+    monkeypatch.setenv("FORGE_ADMIN_KEY", "secret")
+    monkeypatch.setenv("HIDDEN_SPECS_JSON", _make_hidden_specs_env([spec]))
+
+    import importlib
+    import app.db
+    import app.main
+    importlib.reload(app.db)
+    importlib.reload(app.main)
+    from app.main import app
+    from fastapi.testclient import TestClient as TC
+
+    with TC(app) as c:
+        r = c.get(
+            "/admin/hidden/specs/round_001/sample",
+            headers={"Authorization": "Bearer secret"},
+        )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["id"] == spec["id"]
+
+
+def test_hidden_submission_records_with_valid_key(tmp_path, monkeypatch):
+    """POST /admin/hidden/submissions returns 201 and stores the record."""
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("SPECS_DIR", "tests/fixtures/specs")
+    monkeypatch.setenv("FORGE_ADMIN_KEY", "secret")
+
+    import importlib
+    import app.db
+    import app.main
+    importlib.reload(app.db)
+    importlib.reload(app.main)
+    from app.main import app
+    from fastapi.testclient import TestClient as TC
+
+    with TC(app) as c:
+        r = c.post(
+            "/admin/hidden/submissions",
+            json={
+                "spec_id": "hidden_round_001_001_easy",
+                "agent_path": "agents/my-agent/agent.py",
+                "contributor": "miner42",
+                "commit_hash": "deadbeef",
+                "passed": True,
+                "score": 42.5,
+                "metric": "mass_grams",
+            },
+            headers={"Authorization": "Bearer secret"},
+        )
+    assert r.status_code == 201
+    data = r.json()
+    assert data["recorded"] is True
+    assert "id" in data
