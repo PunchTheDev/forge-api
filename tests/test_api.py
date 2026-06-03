@@ -317,3 +317,31 @@ def test_eligibility_maximize_lower_than_sota_ineligible(client: TestClient):
     r = client.get("/sota/001_bracket/eligibility?score=150.0")
     assert r.status_code == 200
     assert r.json()["eligible"] is False
+
+
+def test_sota_history_empty(client: TestClient):
+    r = client.get("/sota/001_bracket/history")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+def test_sota_history_missing_spec(client: TestClient):
+    r = client.get("/sota/does_not_exist/history")
+    assert r.status_code == 404
+
+
+def test_sota_history_records_improvements(client: TestClient):
+    """History only records entries that improved the SOTA."""
+    # First submission sets the record.
+    client.post("/submissions", json={**GOOD_SUBMISSION, "mass_grams": 100.0, "commit_hash": "h1"})
+    # Worse score — not a new SOTA.
+    client.post("/submissions", json={**GOOD_SUBMISSION, "mass_grams": 120.0, "commit_hash": "h2"})
+    # Better score — sets a new SOTA.
+    client.post("/submissions", json={**GOOD_SUBMISSION, "mass_grams": 90.0, "commit_hash": "h3"})
+
+    r = client.get("/sota/001_bracket/history")
+    assert r.status_code == 200
+    history = r.json()
+    assert len(history) == 2
+    assert history[0]["score"] == 100.0
+    assert history[1]["score"] == 90.0

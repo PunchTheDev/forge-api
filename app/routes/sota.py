@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app import specs as spec_store
 from app.db import get_db
-from app.models import SotaEligibility, SotaRecord
+from app.models import SotaEligibility, SotaHistoryPoint, SotaRecord
 from app.scoring import sota_eligible, sota_margin_threshold
 
 router = APIRouter(prefix="/sota", tags=["sota"])
@@ -48,6 +48,53 @@ async def get_sota_eligibility(spec_id: str, score: float = Query(...)):
         margin_grams=required_improvement,
         reason=reason,
     )
+
+
+@router.get("/{spec_id}/history", response_model=list[SotaHistoryPoint])
+async def get_sota_history(spec_id: str):
+    """Progressive SOTA history — each entry is a moment the record improved."""
+    if spec_store.load_one(spec_id) is None:
+        raise HTTPException(status_code=404, detail=f"Spec '{spec_id}' not found")
+
+    query = """
+        SELECT COALESCE(score, mass_grams) AS s, contributor, agent_path, submitted_at,
+               COALESCE(score_direction, 'minimize') AS direction
+        FROM submissions
+        WHERE spec_id = ? AND passed = 1
+        ORDER BY submitted_at ASC
+    """
+    async with get_db() as db:
+        async with db.execute(query, (spec_id,)) as cur:
+            rows = await cur.fetchall()
+
+    if not rows:
+        return []
+
+    direction = rows[0]["direction"]
+    history: list[SotaHistoryPoint] = []
+    running_best: float | None = None
+
+    for row in rows:
+        score = float(row["s"])
+        if running_best is None:
+            is_new_best = True
+        elif direction == "maximize":
+            is_new_best = score > running_best
+        else:
+            is_new_best = score < running_best
+
+        if is_new_best:
+            running_best = score
+            history.append(
+                SotaHistoryPoint(
+                    score=score,
+                    contributor=row["contributor"],
+                    agent_path=row["agent_path"],
+                    submitted_at=datetime.fromisoformat(row["submitted_at"]),
+                )
+            )
+
+    return history
 
 
 @router.get("/{spec_id}", response_model=SotaRecord)

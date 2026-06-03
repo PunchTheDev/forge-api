@@ -145,6 +145,15 @@ class SotaEligibility(BaseModel):
     reason: str
 
 
+class SotaHistoryPoint(BaseModel):
+    """A moment when the SOTA improved — used to draw a progressive score chart."""
+
+    score: float
+    contributor: str
+    agent_path: str
+    submitted_at: datetime
+
+
 class SotaRecord(BaseModel):
     spec_id: str
     submission_id: str  # UUID of the SOTA submission — use with GET /submissions/{id}/step for 3D viewer
