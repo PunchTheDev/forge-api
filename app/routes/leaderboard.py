@@ -18,12 +18,13 @@ router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
 
 @router.get("/overall", response_model=OverallLeaderboard)
 async def get_overall_leaderboard():
-    """Cross-spec leaderboard: ranks contributors by average normalized score.
+    """Cross-spec leaderboard: ranks contributors by mean rank position across entered specs.
 
-    Normalized score: for minimize metrics = score / baseline (lower is better, 1.0 = baseline).
-    For maximize metrics = baseline / score (lower is still better, consistent ranking direction).
-    Only specs with at least one passing submission contribute.
-    Contributors are ranked by their mean normalized score (lower is better).
+    avg_rank = mean(per-spec rank) across all specs a contributor has entered (lower is better).
+    A contributor with avg_rank 1.0 holds #1 on every spec they entered.
+    Tiebreak: specs_entered DESC (more breadth wins ties).
+    Only active-round specs contribute; legacy seed specs are excluded.
+    normalized_score per entry is still returned for per-spec reference display.
     """
     # Only rank against active-round specs; legacy seed specs are excluded.
     active_rounds = [r for r in _load_rounds() if r.status == "active"]
@@ -97,20 +98,20 @@ async def get_overall_leaderboard():
     for contributor, bests in contrib_bests.items():
         specs_entered = len(bests)
         total_wins = sum(1 for b in bests if b.rank == 1)
-        avg_norm = sum(b.normalized_score for b in bests) / specs_entered
+        avg_rank = sum(b.rank for b in bests) / specs_entered
         entries.append(
             OverallLeaderboardEntry(
                 rank=0,  # filled below after sort
                 contributor=contributor,
                 specs_entered=specs_entered,
                 total_wins=total_wins,
-                avg_normalized_score=round(avg_norm, 6),
+                avg_rank=round(avg_rank, 4),
                 best=sorted(bests, key=lambda b: b.spec_id),
             )
         )
 
-    # Primary sort: avg_normalized_score ASC; tiebreak: specs_entered DESC (more breadth wins ties)
-    entries.sort(key=lambda e: (e.avg_normalized_score, -e.specs_entered))
+    # Primary sort: avg_rank ASC (lower = better); tiebreak: specs_entered DESC (more breadth wins ties)
+    entries.sort(key=lambda e: (e.avg_rank, -e.specs_entered))
     for i, entry in enumerate(entries):
         entry.rank = i + 1
 
