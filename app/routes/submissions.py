@@ -201,6 +201,7 @@ async def delete_submission(submission_id: str, x_admin_token: str | None = Head
             raise HTTPException(status_code=404, detail="Submission not found")
         await db.execute("DELETE FROM submissions WHERE id = ?", (submission_id,))
         await db.commit()
+    invalidate_overall_cache()
 
 
 @router.get("/{submission_id}/step")
