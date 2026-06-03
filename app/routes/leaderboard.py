@@ -1,3 +1,4 @@
+import time
 from collections import defaultdict
 
 from fastapi import APIRouter, HTTPException
@@ -15,6 +16,11 @@ from app.routes.rounds import _load_rounds
 
 router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
 
+# Simple in-memory TTL cache for the overall leaderboard — avoids 45 DB
+# queries on every dashboard poll (30s interval).
+_overall_cache: tuple[float, OverallLeaderboard] | None = None
+_OVERALL_TTL = 60.0  # seconds
+
 
 @router.get("/overall", response_model=OverallLeaderboard)
 async def get_overall_leaderboard():
@@ -30,6 +36,17 @@ async def get_overall_leaderboard():
     avg_rank is also computed (over entered specs only) for display purposes.
     Only active-round specs contribute; legacy seed specs are excluded.
     """
+    global _overall_cache
+    now = time.monotonic()
+    if _overall_cache is not None and now - _overall_cache[0] < _OVERALL_TTL:
+        return _overall_cache[1]
+
+    result = await _compute_overall_leaderboard()
+    _overall_cache = (now, result)
+    return result
+
+
+async def _compute_overall_leaderboard() -> OverallLeaderboard:
     # Only rank against active-round specs; legacy seed specs are excluded.
     active_rounds = [r for r in _load_rounds() if r.status == "active"]
     active_spec_ids = {s.id for r in active_rounds for s in r.specs}
@@ -40,43 +57,56 @@ async def get_overall_leaderboard():
     baseline_by_spec = {s.id: s.scoring.baseline_score for s in round_specs}
     direction_by_spec = {s.id: s.scoring.direction for s in round_specs}
 
-    # Per-spec best per contributor, direction-aware.
-    per_spec_rows: dict[str, list] = {}
-    async with get_db() as db:
-        for spec in round_specs:
-            direction = spec.scoring.direction
-            if direction == "maximize":
-                best_agg = "MAX(COALESCE(score, mass_grams))"
-                order_clause = "COALESCE(s.score, s.mass_grams) DESC"
-            else:
-                best_agg = "MIN(COALESCE(score, mass_grams))"
-                order_clause = "COALESCE(s.score, s.mass_grams) ASC"
-            query = f"""
-                SELECT s.id as submission_id, s.contributor,
-                       s.mass_grams, COALESCE(s.score, s.mass_grams) as score,
-                       COALESCE(s.score_metric, 'mass_grams') as score_metric,
-                       s.submitted_at
-                FROM submissions s
-                INNER JOIN (
-                    SELECT contributor, {best_agg} as best_score
-                    FROM submissions
-                    WHERE spec_id = ? AND passed = 1
-                    GROUP BY contributor
-                ) best ON s.contributor = best.contributor
-                       AND COALESCE(s.score, s.mass_grams) = best.best_score
-                       AND s.spec_id = ?
-                       AND s.passed = 1
-                ORDER BY {order_clause}
-            """
-            async with db.execute(query, (spec.id, spec.id)) as cur:
-                per_spec_rows[spec.id] = await cur.fetchall()
+    if not round_specs:
+        return OverallLeaderboard(total_specs=0, entries=[])
 
-    # Aggregate per contributor. Normalize so lower is always better across metrics.
-    contrib_bests: dict[str, list[OverallBestEntry]] = defaultdict(list)
-    for spec_id, rows in per_spec_rows.items():
-        baseline = baseline_by_spec.get(spec_id, 1.0)
+    # Single query: fetch every contributor's best row per spec in one pass.
+    # We pull all passed submissions for active specs and aggregate in Python —
+    # cheaper than 45 sequential queries at the cost of a slightly larger result set.
+    spec_id_placeholders = ",".join("?" * len(round_specs))
+    query = f"""
+        SELECT s.id as submission_id, s.spec_id, s.contributor,
+               s.mass_grams, COALESCE(s.score, s.mass_grams) as score,
+               COALESCE(s.score_metric, 'mass_grams') as score_metric,
+               s.submitted_at
+        FROM submissions s
+        WHERE s.spec_id IN ({spec_id_placeholders}) AND s.passed = 1
+    """
+    spec_ids = [s.id for s in round_specs]
+    async with get_db() as db:
+        async with db.execute(query, spec_ids) as cur:
+            all_rows = await cur.fetchall()
+
+    # Find each contributor's best score per spec (direction-aware).
+    # best_by[spec_id][contributor] = best row seen so far
+    best_by: dict[str, dict[str, dict]] = defaultdict(dict)
+    for row in all_rows:
+        spec_id = row["spec_id"]
+        contributor = row["contributor"]
+        score = row["score"]
         direction = direction_by_spec.get(spec_id, "minimize")
-        for rank_idx, row in enumerate(rows):
+        existing = best_by[spec_id].get(contributor)
+        if existing is None:
+            best_by[spec_id][contributor] = dict(row)
+        else:
+            existing_score = existing["score"]
+            if direction == "maximize" and score > existing_score:
+                best_by[spec_id][contributor] = dict(row)
+            elif direction == "minimize" and score < existing_score:
+                best_by[spec_id][contributor] = dict(row)
+
+    # Rank contributors within each spec, then build per-contributor best lists.
+    contrib_bests: dict[str, list[OverallBestEntry]] = defaultdict(list)
+    for spec_id, contrib_map in best_by.items():
+        direction = direction_by_spec.get(spec_id, "minimize")
+        baseline = baseline_by_spec.get(spec_id, 1.0)
+        # Sort by score to determine ranks
+        ranked = sorted(
+            contrib_map.values(),
+            key=lambda r: r["score"],
+            reverse=(direction == "maximize"),
+        )
+        for rank_idx, row in enumerate(ranked):
             score = row["score"]
             if direction == "maximize":
                 normalized = (baseline / score) if score else 1.0
