@@ -4,6 +4,15 @@
 
 ---
 
+## [0.12.0] — 2026-06-03
+
+### Added
+- `hidden_specs` and `hidden_submissions` tables in DB (`app/db.py`)
+- `app/routes/hidden.py`: `GET /admin/hidden/specs/{round_id}/sample` — returns a random hidden spec for a round (admin key required); `POST /admin/hidden/submissions` — records a hidden eval result; `GET /admin/hidden/submissions/{contributor}` — maintainer review endpoint
+- `_seed_hidden_specs()` at startup: auto-seeds from `HIDDEN_SPECS_JSON` env var (base64 JSON)
+
+---
+
 ## [0.11.0] — 2026-06-03
 
 ### Fixed
