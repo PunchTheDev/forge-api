@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+---
+
+## [0.10.0] — 2026-06-03
+
+### Added
+- `GET /sota/{spec_id}/history` — returns progressive SOTA history (only score-improving points) in chronological order; direction-aware (minimize/maximize); new `SotaHistoryPoint` model
+
+## [0.9.0] — 2026-06-03
+
+### Added
+- Discord SOTA notifications (`app/notify.py`): when a passing, SOTA-eligible submission is recorded, POSTs an embed to `DISCORD_WEBHOOK_URL` (env var); silent no-op if unset
+- `_compute_eligibility` now returns `(eligible, old_sota_score)` to show improvement delta in alerts
+
 ### Added
 - `GET /health/deep` — checks DB connectivity, rounds loaded, and specs accessible; returns `ok` or `degraded` with per-component status
 
