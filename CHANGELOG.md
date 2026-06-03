@@ -4,6 +4,14 @@
 
 ---
 
+## [0.13.0] — 2026-06-03
+
+### Changed
+- `GET /leaderboard/overall`: overall ranking now uses `avg_rank` (mean per-spec rank position, lower is better) instead of `avg_normalized_score`. Fixes cross-metric bias: deflection baselines are theoretical minima (solid block), making normalized scores 50–100× larger than other metrics and systematically disadvantaging round_003 contributors.
+- `OverallLeaderboardEntry.avg_normalized_score` renamed to `avg_rank`
+
+---
+
 ## [0.12.0] — 2026-06-03
 
 ### Added
