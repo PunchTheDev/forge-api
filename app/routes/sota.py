@@ -5,14 +5,25 @@ from fastapi import APIRouter, HTTPException, Query
 from app import specs as spec_store
 from app.db import get_db
 from app.models import SotaEligibility, SotaHistoryPoint, SotaRecord
+from app.routes.rounds import _load_rounds
 from app.scoring import sota_eligible, sota_margin_threshold
 
 router = APIRouter(prefix="/sota", tags=["sota"])
 
 
 @router.get("", response_model=list[SotaRecord])
-async def list_sota():
-    specs = spec_store.load_all()
+async def list_sota(round_id: str | None = Query(None, description="Filter by round ID, e.g. round_001")):
+    """List current SOTA for all specs. Optionally filter to one round."""
+    all_specs = spec_store.load_all()
+    if round_id is not None:
+        rounds = _load_rounds()
+        matching = next((r for r in rounds if r.id == round_id), None)
+        if matching is None:
+            raise HTTPException(status_code=404, detail=f"Round '{round_id}' not found")
+        round_spec_ids = {s.id for s in matching.specs}
+        specs = [s for s in all_specs if s.id in round_spec_ids]
+    else:
+        specs = all_specs
     results = []
     for spec in specs:
         record = await _get_sota(spec.id)

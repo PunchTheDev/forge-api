@@ -684,3 +684,129 @@ def test_spec_round_id_field_in_response(client: TestClient):
     r = client.get("/specs/001_bracket")
     assert r.status_code == 200
     assert r.json()["round_id"] is None
+
+
+def test_sota_round_filter_not_found(client: TestClient):
+    """GET /sota?round_id=nonexistent returns 404."""
+    r = client.get("/sota?round_id=nonexistent_round")
+    assert r.status_code == 404
+
+
+def test_sota_round_filter_empty_round(tmp_path, monkeypatch):
+    """GET /sota?round_id=round_x with no submissions returns []."""
+    import importlib, json
+
+    rounds_dir = tmp_path / "rounds"
+    rounds_dir.mkdir()
+    specs_dir = tmp_path / "specs"
+    specs_dir.mkdir()
+
+    spec_data = {
+        "id": "rs_001_easy",
+        "version": "1.0",
+        "name": "Test spec",
+        "description": "desc",
+        "material": "pla",
+        "constraints": {
+            "load_newtons": 100.0, "load_point_mm": [50.0, 25.0, 25.0],
+            "safety_factor": 1.5, "bolt_pattern_mm": [[0.0, 0.0], [50.0, 0.0]],
+            "bolt_diameter_clearance_mm": 6.5, "mount_face_x_mm": 0.0,
+            "build_volume_mm": [100.0, 80.0, 60.0],
+            "max_overhang_deg": 50.0, "min_wall_thickness_mm": 1.0,
+        },
+        "scoring": {"metric": "mass_grams", "direction": "minimize"},
+    }
+    (specs_dir / "rs_001_easy.json").write_text(json.dumps(spec_data))
+
+    round_data = {
+        "id": "round_sota_test", "name": "SOTA filter test", "description": "d",
+        "status": "active", "starts": "2026-01-01", "ends": None,
+        "scoring_metric": "mass_grams", "scoring_direction": "minimize",
+        "specs": [{"id": "rs_001_easy", "tier": "easy"}], "notes": None,
+    }
+    (rounds_dir / "round_sota_test.json").write_text(json.dumps(round_data))
+
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("SPECS_DIR", str(specs_dir))
+    monkeypatch.setenv("ROUNDS_DIR", str(rounds_dir))
+
+    import app.db, app.main, app.routes.rounds, app.routes.sota, app.specs
+    importlib.reload(app.db)
+    importlib.reload(app.specs)
+    importlib.reload(app.routes.rounds)
+    importlib.reload(app.routes.sota)
+    importlib.reload(app.main)
+    from app.main import app
+
+    from fastapi.testclient import TestClient
+    with TestClient(app) as c:
+        r = c.get("/sota?round_id=round_sota_test")
+        assert r.status_code == 200
+        assert r.json() == []  # no submissions yet
+
+
+def test_sota_round_filter_with_submission(tmp_path, monkeypatch):
+    """GET /sota?round_id=round_x only returns SOTAs for specs in that round."""
+    import importlib, json
+
+    rounds_dir = tmp_path / "rounds"
+    rounds_dir.mkdir()
+    specs_dir = tmp_path / "specs"
+    specs_dir.mkdir()
+
+    # Two specs: one in our round, one legacy
+    def _spec(spec_id):
+        return {
+            "id": spec_id, "version": "1.0", "name": f"Spec {spec_id}", "description": "d",
+            "material": "pla",
+            "constraints": {
+                "load_newtons": 100.0, "load_point_mm": [50.0, 25.0, 25.0],
+                "safety_factor": 1.5, "bolt_pattern_mm": [[0.0, 0.0], [50.0, 0.0]],
+                "bolt_diameter_clearance_mm": 6.5, "mount_face_x_mm": 0.0,
+                "build_volume_mm": [100.0, 80.0, 60.0],
+                "max_overhang_deg": 50.0, "min_wall_thickness_mm": 1.0,
+            },
+            "scoring": {"metric": "mass_grams", "direction": "minimize"},
+        }
+
+    (specs_dir / "rf_001_easy.json").write_text(json.dumps(_spec("rf_001_easy")))
+    (specs_dir / "legacy_spec.json").write_text(json.dumps(_spec("legacy_spec")))
+
+    round_data = {
+        "id": "round_filter", "name": "Filter round", "description": "d",
+        "status": "active", "starts": "2026-01-01", "ends": None,
+        "scoring_metric": "mass_grams", "scoring_direction": "minimize",
+        "specs": [{"id": "rf_001_easy", "tier": "easy"}], "notes": None,
+    }
+    (rounds_dir / "round_filter.json").write_text(json.dumps(round_data))
+
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("SPECS_DIR", str(specs_dir))
+    monkeypatch.setenv("ROUNDS_DIR", str(rounds_dir))
+
+    import app.db, app.main, app.routes.rounds, app.routes.sota, app.specs
+    importlib.reload(app.db)
+    importlib.reload(app.specs)
+    importlib.reload(app.routes.rounds)
+    importlib.reload(app.routes.sota)
+    importlib.reload(app.main)
+    from app.main import app
+
+    from fastapi.testclient import TestClient
+    with TestClient(app) as c:
+        base = {"agent_path": "a/b", "commit_hash": "abc", "mass_grams": 80.0,
+                "fea_stress_mpa": 5.0, "fea_allowable_mpa": 25.0, "passed": True, "pr_number": 1, "contributor": "Alice"}
+        c.post("/submissions", json={**base, "spec_id": "rf_001_easy"})
+        c.post("/submissions", json={**base, "spec_id": "legacy_spec"})
+
+        # Filter returns only the round spec
+        r = c.get("/sota?round_id=round_filter")
+        assert r.status_code == 200
+        results = r.json()
+        assert len(results) == 1
+        assert results[0]["spec_id"] == "rf_001_easy"
+
+        # No filter returns both
+        r2 = c.get("/sota")
+        assert r2.status_code == 200
+        assert len(r2.json()) == 2
