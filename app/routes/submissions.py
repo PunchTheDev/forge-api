@@ -1,4 +1,5 @@
 import base64
+import hmac
 import os
 import uuid
 from datetime import datetime, timezone
@@ -16,6 +17,15 @@ router = APIRouter(prefix="/submissions", tags=["submissions"])
 admin_router = APIRouter(prefix="/admin/submissions", tags=["admin"])
 
 MAX_EVALS_PER_DAY = int(os.environ.get("MAX_EVALS_PER_DAY", "20"))
+
+
+def _require_admin_token(token: str | None) -> None:
+    """Validate X-Admin-Token using constant-time comparison to prevent timing attacks."""
+    expected = os.environ.get("ADMIN_SECRET", "")
+    if not expected:
+        raise HTTPException(status_code=503, detail="Admin endpoint not configured (ADMIN_SECRET not set)")
+    if token is None or not hmac.compare_digest(token, expected):
+        raise HTTPException(status_code=403, detail="Invalid or missing admin token")
 
 
 @router.post("", response_model=Submission, status_code=201)
@@ -149,9 +159,7 @@ async def batch_create_submissions(
     x_admin_token: str | None = Header(None),
 ):
     """Insert multiple submissions without rate limiting. Requires X-Admin-Token."""
-    expected = os.environ.get("ADMIN_SECRET", "")
-    if not expected or x_admin_token != expected:
-        raise HTTPException(status_code=403, detail="Invalid or missing admin token")
+    _require_admin_token(x_admin_token)
 
     inserted = 0
     failed = 0
@@ -204,9 +212,7 @@ async def batch_create_submissions(
 @router.delete("/{submission_id}", status_code=204)
 async def delete_submission(submission_id: str, x_admin_token: str | None = Header(None)):
     """Delete a submission by ID. Requires X-Admin-Token header matching ADMIN_SECRET env var."""
-    expected = os.environ.get("ADMIN_SECRET", "")
-    if not expected or x_admin_token != expected:
-        raise HTTPException(status_code=403, detail="Invalid or missing admin token")
+    _require_admin_token(x_admin_token)
     async with get_db() as db:
         async with db.execute("SELECT id FROM submissions WHERE id = ?", (submission_id,)) as cur:
             row = await cur.fetchone()
