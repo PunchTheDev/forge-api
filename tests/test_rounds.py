@@ -91,6 +91,84 @@ def test_round_specs_structure(rounds_client):
     assert "file" in specs[0]
 
 
+def test_round_stats_empty(rounds_client):
+    """Stats for a round with no submissions shows all specs unclaimed."""
+    resp = rounds_client.get("/rounds/round_test/stats")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["round_id"] == "round_test"
+    assert data["specs_total"] == 1
+    assert data["specs_claimed"] == 0
+    assert data["specs_unclaimed"] == 1
+    assert data["contributor_count"] == 0
+    assert "easy" in data["tiers"]
+    assert data["tiers"]["easy"]["total"] == 1
+    assert data["tiers"]["easy"]["claimed"] == 0
+
+
+def test_round_stats_not_found(rounds_client):
+    resp = rounds_client.get("/rounds/does_not_exist/stats")
+    assert resp.status_code == 404
+
+
+def test_round_stats_with_submissions(tmp_path, monkeypatch):
+    """Stats correctly counts claimed specs and unique contributors."""
+    import importlib
+    import json
+
+    rounds_dir = tmp_path / "rounds"
+    rounds_dir.mkdir()
+    specs_dir = tmp_path / "specs"
+    specs_dir.mkdir()
+
+    # Round with two easy specs and one medium
+    round_data = {
+        "id": "round_s",
+        "name": "Stats Test Round",
+        "description": "For testing stats.",
+        "status": "active",
+        "starts": "2026-01-01",
+        "ends": None,
+        "scoring_metric": "mass_grams",
+        "scoring_direction": "minimize",
+        "specs": [
+            {"id": "stat_easy_1", "tier": "easy"},
+            {"id": "stat_easy_2", "tier": "easy"},
+            {"id": "stat_medium_1", "tier": "medium"},
+        ],
+        "notes": None,
+    }
+    (rounds_dir / "round_s.json").write_text(json.dumps(round_data))
+
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("SPECS_DIR", str(specs_dir))
+    monkeypatch.setenv("ROUNDS_DIR", str(rounds_dir))
+
+    import app.db, app.main, app.routes.rounds
+    importlib.reload(app.db)
+    importlib.reload(app.routes.rounds)
+    importlib.reload(app.main)
+    from app.main import app
+
+    with TestClient(app) as c:
+        base = {"agent_path": "a/b", "mass_grams": 100.0,
+                "fea_stress_mpa": 5.0, "fea_allowable_mpa": 25.0, "passed": True, "pr_number": 1}
+        # Two contributors submit on stat_easy_1, nobody on stat_easy_2 or stat_medium_1
+        c.post("/submissions", json={**base, "spec_id": "stat_easy_1", "contributor": "Alice", "commit_hash": "abc1"})
+        c.post("/submissions", json={**base, "spec_id": "stat_easy_1", "contributor": "Bob", "mass_grams": 90.0, "commit_hash": "abc2"})
+
+        resp = c.get("/rounds/round_s/stats")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["specs_total"] == 3
+        assert data["specs_claimed"] == 1
+        assert data["specs_unclaimed"] == 2
+        assert data["contributor_count"] == 2
+        assert data["tiers"]["easy"]["claimed"] == 1
+        assert data["tiers"]["easy"]["unclaimed"] == 1
+        assert data["tiers"]["medium"]["claimed"] == 0
+
+
 def test_upcoming_round_null_starts(tmp_path, monkeypatch):
     """Rounds with starts=null (upcoming) load without validation errors."""
     rounds_dir = tmp_path / "rounds"
