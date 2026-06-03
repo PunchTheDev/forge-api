@@ -4,6 +4,11 @@
 
 ---
 
+## [0.13.1] — 2026-06-03
+
+### Fixed
+- `app/main.py` version string updated from `0.1.0` to `0.13.0` — was showing stale version in `/docs` OpenAPI UI and `GET /openapi.json`.
+
 ## [0.13.0] — 2026-06-03
 
 ### Changed
