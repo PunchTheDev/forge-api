@@ -1,7 +1,10 @@
-"""Deep health check — verifies DB, rounds, and specs are accessible."""
+"""Deep health check — verifies DB, rounds, specs, and storage are accessible."""
+
+import asyncio
 
 from fastapi import APIRouter
 
+import app.storage as storage
 from app.db import get_db
 from app.routes.rounds import _load_rounds
 from app.specs import load_all as load_all_specs
@@ -45,5 +48,21 @@ async def health_deep():
     except Exception as exc:
         checks["specs"] = {"status": "error", "detail": str(exc)}
         ok = False
+
+    # Storage check
+    if storage.is_configured():
+        try:
+            bucket = __import__("os").environ["S3_BUCKET"]
+
+            def _head():
+                storage._client().head_bucket(Bucket=bucket)
+
+            await asyncio.to_thread(_head)
+            checks["storage"] = {"status": "ok", "backend": "s3", "bucket": bucket}
+        except Exception as exc:
+            checks["storage"] = {"status": "error", "backend": "s3", "detail": str(exc)}
+            ok = False
+    else:
+        checks["storage"] = {"status": "ok", "backend": "sqlite_blob"}
 
     return {"status": "ok" if ok else "degraded", "checks": checks}
