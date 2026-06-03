@@ -128,7 +128,8 @@ class OverallLeaderboardEntry(BaseModel):
     contributor: str
     specs_entered: int
     total_wins: int  # number of specs where this contributor holds rank 1
-    avg_rank: float  # mean rank position across entered specs (1.0 = always #1; lower is better)
+    avg_rank: float  # mean rank position across entered specs (display only)
+    overall_score: float = 1.0  # mean normalized score across ALL active specs; < 1.0 = beating baseline; primary sort key
     best: list[OverallBestEntry]
 
 

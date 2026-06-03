@@ -18,13 +18,17 @@ router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
 
 @router.get("/overall", response_model=OverallLeaderboard)
 async def get_overall_leaderboard():
-    """Cross-spec leaderboard: ranks contributors by mean rank position across entered specs.
+    """Cross-spec leaderboard: ranks contributors by breadth-normalized score.
 
-    avg_rank = mean(per-spec rank) across all specs a contributor has entered (lower is better).
-    A contributor with avg_rank 1.0 holds #1 on every spec they entered.
-    Tiebreak: specs_entered DESC (more breadth wins ties).
+    overall_score = mean(normalized_score) across ALL active-round specs.
+    Unentered specs contribute 1.0 (baseline performance) to the mean.
+    A normalized_score < 1.0 means the agent beat baseline on that spec.
+    Lower overall_score = better (consistently below baseline on more specs).
+
+    This rewards well-rounded agents: a specialist dominating 3 easy specs
+    cannot beat a generalist that is merely good across all 45.
+    avg_rank is also computed (over entered specs only) for display purposes.
     Only active-round specs contribute; legacy seed specs are excluded.
-    normalized_score per entry is still returned for per-spec reference display.
     """
     # Only rank against active-round specs; legacy seed specs are excluded.
     active_rounds = [r for r in _load_rounds() if r.status == "active"]
@@ -98,7 +102,16 @@ async def get_overall_leaderboard():
     for contributor, bests in contrib_bests.items():
         specs_entered = len(bests)
         total_wins = sum(1 for b in bests if b.rank == 1)
+
+        # avg_rank over entered specs only (for display)
         avg_rank = sum(b.rank for b in bests) / specs_entered
+
+        # overall_score = mean normalized over ALL active specs.
+        # Unentered specs count as 1.0 (baseline). Better-than-baseline = < 1.0.
+        entered_norm_sum = sum(b.normalized_score for b in bests)
+        missing_specs = total_specs - specs_entered
+        overall_score = (entered_norm_sum + missing_specs * 1.0) / total_specs if total_specs else 1.0
+
         entries.append(
             OverallLeaderboardEntry(
                 rank=0,  # filled below after sort
@@ -106,12 +119,14 @@ async def get_overall_leaderboard():
                 specs_entered=specs_entered,
                 total_wins=total_wins,
                 avg_rank=round(avg_rank, 4),
+                overall_score=round(overall_score, 6),
                 best=sorted(bests, key=lambda b: b.spec_id),
             )
         )
 
-    # Primary sort: avg_rank ASC (lower = better); tiebreak: specs_entered DESC (more breadth wins ties)
-    entries.sort(key=lambda e: (e.avg_rank, -e.specs_entered))
+    # Primary sort: overall_score ASC (lower = better — more specs beaten, by more margin)
+    # Tiebreak: specs_entered DESC (more breadth wins ties at equal overall_score)
+    entries.sort(key=lambda e: (e.overall_score, -e.specs_entered))
     for i, entry in enumerate(entries):
         entry.rank = i + 1
 
