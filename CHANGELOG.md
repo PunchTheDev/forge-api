@@ -1,6 +1,14 @@
 # Changelog
 
-## [Unreleased]
+## [0.15.0] — 2026-06-03
+
+### Added
+- **`Spec.round_id` computed field** (PR #68, `app/models.py`): derives round ID from spec ID prefix (`r01_` → `round_001`, etc.). Returns `null` for legacy and catalog specs. Exposed in all spec responses.
+- **`GET /specs?round_id=`** (PR #68, `app/routes/specs.py`): filter specs by round (e.g. `?round_id=round_001`). Composes with existing `?tier=` filter.
+- **`GET /specs?material=`** (PR #68, `app/routes/specs.py`): filter specs by material string (e.g. `?material=pla`, `?material=aluminum_6061`). Composes with `?round_id=` and `?tier=`.
+
+### Tests
+- **10 new tests** (PR #68): `Spec.round_id` unit tests for r01/r02/r10/legacy/pub variants; API integration tests for `?round_id=`, `?material=`, combined filters, and `round_id` field in response. Test count: 108 → 118.
 
 ---
 
