@@ -393,3 +393,48 @@ def test_batch_submissions_stores_score_fields(client: TestClient, monkeypatch):
     assert subs[0]["score"] == 3.75
     assert subs[0]["score_metric"] == "stiffness_to_weight"
     assert subs[0]["score_direction"] == "maximize"
+
+
+# --- hidden admin endpoint auth ---
+
+def test_hidden_spec_returns_503_when_key_unset(client: TestClient, monkeypatch):
+    """Returns 503 when FORGE_ADMIN_KEY is not set — not 200 or 403."""
+    monkeypatch.delenv("FORGE_ADMIN_KEY", raising=False)
+    r = client.get(
+        "/admin/hidden/specs/round_001/sample",
+        headers={"Authorization": "Bearer anything"},
+    )
+    assert r.status_code == 503
+
+
+def test_hidden_spec_returns_403_on_wrong_key(client: TestClient, monkeypatch):
+    """Returns 403 when FORGE_ADMIN_KEY is set but token is wrong."""
+    monkeypatch.setenv("FORGE_ADMIN_KEY", "correct-key")
+    r = client.get(
+        "/admin/hidden/specs/round_001/sample",
+        headers={"Authorization": "Bearer wrong-key"},
+    )
+    assert r.status_code == 403
+
+
+def test_hidden_spec_returns_403_on_missing_token(client: TestClient, monkeypatch):
+    """Returns 403 when FORGE_ADMIN_KEY is set but no token is provided."""
+    monkeypatch.setenv("FORGE_ADMIN_KEY", "correct-key")
+    r = client.get("/admin/hidden/specs/round_001/sample")
+    assert r.status_code == 403
+
+
+def test_hidden_submission_requires_auth(client: TestClient, monkeypatch):
+    """POST /admin/hidden/submissions returns 503 without key configured."""
+    monkeypatch.delenv("FORGE_ADMIN_KEY", raising=False)
+    r = client.post(
+        "/admin/hidden/submissions",
+        json={
+            "spec_id": "hidden_001",
+            "agent_path": "agents/test/agent.py",
+            "contributor": "TestBot",
+            "commit_hash": "abc",
+            "passed": True,
+        },
+    )
+    assert r.status_code == 503
