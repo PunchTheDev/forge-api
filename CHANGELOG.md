@@ -4,6 +4,16 @@
 
 ---
 
+## [0.14.5] — 2026-06-03
+
+### Fixed
+- **Batch submission `sota_eligible`** (PR #66, `app/routes/submissions.py`): batch-inserted submissions now explicitly set `sota_eligible = 0` instead of leaving it `NULL`. Batch inserts are historical/seed data and should never be treated as SOTA-eligible.
+
+### Tests
+- **6 new tests** (PR #66, `tests/test_api.py`): `DELETE /submissions/{id}` auth and deletion, `GET /submissions?contributor=` filter, and batch `sota_eligible` correctness. Test count: 102 → 108.
+
+---
+
 ## [0.14.4] — 2026-06-03
 
 ### Added
