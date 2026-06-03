@@ -5,10 +5,17 @@
 ### Changed
 - `GET /leaderboard/overall`: ranking sort key changed from `avg_rank` (entered specs only) to `overall_score` — mean normalized performance across ALL active specs. Unentered specs contribute 1.0 (baseline) to the mean. A specialist entering 3 easy specs at #1 can no longer outrank a well-rounded agent competing across all 45. `avg_rank` is retained as a display-only field.
 - `OverallLeaderboardEntry.overall_score` added (float, default 1.0); lower is better; 0.0 = beating baseline on every spec.
+- `GET /leaderboard/overall` `normalized_score` per spec changed from `score / baseline_score` to `rank / (N+1)` percentile rank. Fully metric-agnostic: `deflection_mm`, `stiffness_to_weight`, and `mass_grams` all produce normalized values in (0, 1) regardless of how hard their baselines are to achieve.
+
+### Security
+- `POST /submissions`: added (commit_hash, spec_id) uniqueness check before insert. Returns 409 Conflict when the same commit is re-submitted for the same spec, regardless of contributor name. Closes rate-limit bypass via contributor name cycling.
 
 ### Performance
 - `GET /leaderboard/overall` N+1 query loop (one query per active spec) collapsed into a single query. Best-per-contributor aggregation and ranking now done in Python.
 - In-memory TTL cache (60 seconds) for `/leaderboard/overall`. Cache invalidated immediately on submission create, delete, or batch-insert.
+
+### Known scaling limitation (operator action required before 100+ miners)
+- STEP files are stored as BLOBs in SQLite. At 100 miners × 45 specs × ~5 MB/file, the DB will exceed 20 GB. Recommended fix: move STEP storage to S3-compatible object storage (e.g. R2 or MinIO) and store object keys in the `step_data` column. Until this is done, limit `step_b64` ingestion or increase SQLite page limits via `PRAGMA max_page_count`.
 
 ---
 
