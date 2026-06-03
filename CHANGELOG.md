@@ -4,6 +4,13 @@
 
 ---
 
+## 2026-06-03 (step 220)
+
+### Fixed
+- **Leaderboard `has_step` false negative with S3 storage** (PR #54, `app/routes/leaderboard.py`): `GET /leaderboard/{spec_id}` returned `has_step: false` for all entries once `S3_BUCKET` is active — same root cause as PR #52 (only `step_data IS NOT NULL` was checked, ignoring `step_key`). The 3D viewer link on the per-spec leaderboard page would silently not appear for any S3-stored STEP. Fixed by extending the SQL to `(s.step_data IS NOT NULL OR s.step_key IS NOT NULL)`. Added `test_leaderboard_has_step_true_when_step_key_set`. Test count: 93 → 94.
+
+---
+
 ## 2026-06-03 (step 219)
 
 ### Fixed
