@@ -69,8 +69,8 @@ def test_overall_single_contributor_one_spec(client: TestClient):
     assert e["contributor"] == "TestMiner"
     assert e["specs_entered"] == 1
     assert e["total_wins"] == 1
-    expected = round(108.48 / 180.0, 6)
-    assert abs(e["avg_normalized_score"] - expected) < 1e-4
+    # Only contributor on this spec → rank #1 → avg_rank = 1.0
+    assert e["avg_rank"] == 1.0
 
 
 def test_overall_single_contributor_two_specs(client: TestClient):
@@ -81,8 +81,8 @@ def test_overall_single_contributor_two_specs(client: TestClient):
     e = body["entries"][0]
     assert e["specs_entered"] == 2
     assert e["total_wins"] == 2
-    expected = round((108.48 / 180.0 + 160.0 / 200.0) / 2, 6)
-    assert abs(e["avg_normalized_score"] - expected) < 1e-4
+    # Only contributor on both specs → rank #1 on each → avg_rank = 1.0
+    assert e["avg_rank"] == 1.0
     assert len(e["best"]) == 2
     # best list is sorted by spec_id
     assert e["best"][0]["spec_id"] == "001_bracket"
@@ -122,8 +122,9 @@ def test_overall_uses_best_per_spec(client: TestClient):
 
     r = client.get("/leaderboard/overall")
     e = r.json()["entries"][0]
-    expected = round(100.0 / 180.0, 6)
-    assert abs(e["avg_normalized_score"] - expected) < 1e-4
+    # Only contributor → rank #1 on spec1 → avg_rank = 1.0 (score used is best: 100g)
+    assert e["avg_rank"] == 1.0
+    assert e["best"][0]["score"] == 100.0
 
 
 def test_overall_total_wins_counts_correctly(client: TestClient):
