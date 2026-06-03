@@ -5,8 +5,9 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Header, HTTPException, Query
-from fastapi.responses import Response
+from fastapi.responses import RedirectResponse, Response
 
+from app import storage
 from app.db import get_db
 from app.models import Submission, SubmissionCreate
 from app.notify import send_sota_alert
@@ -33,7 +34,22 @@ async def create_submission(body: SubmissionCreate):
     sub_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
     today = now[:10]  # "YYYY-MM-DD"
-    step_data = base64.b64decode(body.step_b64) if body.step_b64 else None
+    raw_step = base64.b64decode(body.step_b64) if body.step_b64 else None
+
+    # Upload to S3 when configured; otherwise fall back to SQLite BLOB.
+    step_key: str | None = None
+    step_data: bytes | None = None
+    if raw_step is not None:
+        if storage.is_configured():
+            try:
+                step_key = await storage.upload(sub_id, raw_step)
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"STEP upload failed: {exc}",
+                )
+        else:
+            step_data = raw_step
 
     # Compute SOTA eligibility before inserting so we can store it.
     score_for_eligibility = body.score if body.score is not None else body.mass_grams
@@ -69,8 +85,8 @@ async def create_submission(body: SubmissionCreate):
             """INSERT INTO submissions
                (id, spec_id, agent_path, contributor, commit_hash, mass_grams,
                 fea_stress_mpa, fea_allowable_mpa, passed, pr_number, notes, submitted_at, step_data,
-                sota_eligible, score, score_metric, score_direction)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                sota_eligible, score, score_metric, score_direction, step_key)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 sub_id,
                 body.spec_id,
@@ -89,6 +105,7 @@ async def create_submission(body: SubmissionCreate):
                 score,
                 body.score_metric,
                 body.score_direction,
+                step_key,
             ),
         )
         await db.commit()
@@ -106,7 +123,7 @@ async def create_submission(body: SubmissionCreate):
             body.contributor,
         )
 
-    return _build_submission(sub_id, now, body, step_data is not None, eligible, score)
+    return _build_submission(sub_id, now, body, raw_step is not None, eligible, score)
 
 
 @router.get("", response_model=list[Submission])
@@ -225,14 +242,21 @@ async def delete_submission(submission_id: str, x_admin_token: str | None = Head
 
 @router.get("/{submission_id}/step")
 async def get_submission_step(submission_id: str):
-    """Return the raw STEP file bytes for 3D viewing."""
+    """Return the STEP file for 3D viewing.
+
+    Redirects to a presigned S3 URL when the file is stored in S3;
+    otherwise streams the SQLite BLOB directly.
+    """
     async with get_db() as db:
         async with db.execute(
-            "SELECT step_data FROM submissions WHERE id = ?", (submission_id,)
+            "SELECT step_data, step_key FROM submissions WHERE id = ?", (submission_id,)
         ) as cur:
             row = await cur.fetchone()
     if row is None:
         raise HTTPException(status_code=404, detail="Submission not found")
+    if row["step_key"] is not None:
+        url = await storage.presign(row["step_key"])
+        return RedirectResponse(url=url, status_code=302)
     if row["step_data"] is None:
         raise HTTPException(status_code=404, detail="No STEP file stored for this submission")
     return Response(
@@ -289,7 +313,7 @@ def _row_to_submission(row) -> Submission:
         pr_number=row["pr_number"],
         notes=row["notes"],
         submitted_at=datetime.fromisoformat(row["submitted_at"]),
-        has_step=row["step_data"] is not None,
+        has_step=row["step_data"] is not None or row["step_key"] is not None,
         sota_eligible=bool(raw_eligible) if raw_eligible is not None else None,
         score=raw_score if raw_score is not None else row["mass_grams"],
         score_metric=row["score_metric"] or "mass_grams",
