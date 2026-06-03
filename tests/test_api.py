@@ -515,3 +515,34 @@ def test_hidden_submission_records_with_valid_key(tmp_path, monkeypatch):
     data = r.json()
     assert data["recorded"] is True
     assert "id" in data
+
+
+def test_list_specs_tier_filter_hard(tmp_path, monkeypatch):
+    """GET /specs?tier=hard returns only specs whose id ends in _hard."""
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("SPECS_DIR", "tests/fixtures/specs_multi")
+
+    import importlib
+    import app.db
+    import app.specs as app_specs
+    import app.main
+    importlib.reload(app.db)
+    importlib.reload(app_specs)
+    importlib.reload(app.main)
+    from app.main import app
+    from fastapi.testclient import TestClient as TC
+
+    with TC(app) as c:
+        r = c.get("/specs?tier=hard")
+    assert r.status_code == 200
+    specs = r.json()
+    assert len(specs) >= 1
+    assert all(s["tier"] == "hard" for s in specs)
+    assert all(s["id"].endswith("_hard") for s in specs)
+
+
+def test_spec_tier_field_in_response(client: TestClient):
+    """Spec response includes computed tier field (None for legacy IDs)."""
+    r = client.get("/specs/001_bracket")
+    assert r.status_code == 200
+    assert r.json()["tier"] is None
