@@ -193,8 +193,8 @@ async def batch_create_submissions(
                     """INSERT INTO submissions
                        (id, spec_id, agent_path, contributor, commit_hash, mass_grams,
                         fea_stress_mpa, fea_allowable_mpa, passed, pr_number, notes, submitted_at, step_data,
-                        score, score_metric, score_direction)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        sota_eligible, score, score_metric, score_direction)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         sub_id,
                         item.spec_id,
@@ -209,6 +209,7 @@ async def batch_create_submissions(
                         item.notes,
                         now,
                         step_data,
+                        0,  # batch inserts are seed/historical data — not SOTA-eligible
                         score,
                         item.score_metric,
                         item.score_direction,
