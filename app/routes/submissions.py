@@ -182,6 +182,9 @@ async def batch_create_submissions(
                 errors.append({"index": i, "error": str(exc)})
         await db.commit()
 
+    if inserted > 0:
+        invalidate_overall_cache()
+
     return {"inserted": inserted, "failed": failed, "errors": errors}
 
 
