@@ -9,6 +9,7 @@ from fastapi.responses import Response
 from app.db import get_db
 from app.models import Submission, SubmissionCreate
 from app.notify import send_sota_alert
+from app.routes.leaderboard import invalidate_overall_cache
 from app.scoring import sota_eligible as compute_sota_eligible
 
 router = APIRouter(prefix="/submissions", tags=["submissions"])
@@ -68,6 +69,9 @@ async def create_submission(body: SubmissionCreate):
             ),
         )
         await db.commit()
+
+    if body.passed:
+        invalidate_overall_cache()
 
     if eligible and body.passed:
         await send_sota_alert(
@@ -178,6 +182,9 @@ async def batch_create_submissions(
                 errors.append({"index": i, "error": str(exc)})
         await db.commit()
 
+    if inserted > 0:
+        invalidate_overall_cache()
+
     return {"inserted": inserted, "failed": failed, "errors": errors}
 
 
@@ -194,6 +201,7 @@ async def delete_submission(submission_id: str, x_admin_token: str | None = Head
             raise HTTPException(status_code=404, detail="Submission not found")
         await db.execute("DELETE FROM submissions WHERE id = ?", (submission_id,))
         await db.commit()
+    invalidate_overall_cache()
 
 
 @router.get("/{submission_id}/step")
