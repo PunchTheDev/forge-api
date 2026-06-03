@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Changed
+- `GET /leaderboard/overall`: ranking sort key changed from `avg_rank` (entered specs only) to `overall_score` — mean normalized performance across ALL active specs. Unentered specs contribute 1.0 (baseline) to the mean. A specialist entering 3 easy specs at #1 can no longer outrank a well-rounded agent competing across all 45. `avg_rank` is retained as a display-only field.
+- `OverallLeaderboardEntry.overall_score` added (float, default 1.0); lower is better; 0.0 = beating baseline on every spec.
+
+### Performance
+- `GET /leaderboard/overall` N+1 query loop (one query per active spec) collapsed into a single query. Best-per-contributor aggregation and ranking now done in Python.
+- In-memory TTL cache (60 seconds) for `/leaderboard/overall`. Cache invalidated immediately on submission create, delete, or batch-insert.
+
 ---
 
 ## [0.13.2] — 2026-06-03
