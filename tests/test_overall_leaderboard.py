@@ -10,7 +10,7 @@ SPEC1_SUB = {
     "agent_path": "agents/slim-spine",
     "contributor": "TestMiner",
     "commit_hash": "abc1234",
-    "mass_grams": 108.48,   # baseline 180g → norm 0.6027
+    "mass_grams": 108.48,
     "fea_stress_mpa": 7.50,
     "fea_allowable_mpa": 25.0,
     "passed": True,
@@ -21,7 +21,7 @@ SPEC2_SUB = {
     "agent_path": "agents/slim-spine",
     "contributor": "TestMiner",
     "commit_hash": "abc5678",
-    "mass_grams": 160.0,    # baseline 200g → norm 0.80
+    "mass_grams": 160.0,
     "fea_stress_mpa": 8.0,
     "fea_allowable_mpa": 25.0,
     "passed": True,
@@ -90,16 +90,18 @@ def test_overall_single_contributor_two_specs(client: TestClient):
 
 
 def test_overall_two_contributors_ranked_correctly(client: TestClient):
-    # Alice wins spec1 cheaply; Bob wins spec2 cheaply — different normalized scores
+    # Both enter spec1: Alice lighter → rank 1, Bob heavier → rank 2.
+    # With N=2: Alice norm = 1/(2+1) = 0.333, Bob norm = 2/(2+1) = 0.667.
+    # overall_score (3 active specs): Alice = (0.333+1.0+1.0)/3 = 0.778, Bob = (0.667+1.0+1.0)/3 = 0.889.
+    # Alice < Bob → Alice #1.
     alice = {**SPEC1_SUB, "contributor": "Alice", "mass_grams": 90.0, "commit_hash": "a1"}
-    bob = {**SPEC2_SUB, "contributor": "Bob", "mass_grams": 180.0, "commit_hash": "b1"}
+    bob = {**SPEC1_SUB, "contributor": "Bob", "mass_grams": 180.0, "commit_hash": "b1"}
     client.post("/submissions", json=alice)
     client.post("/submissions", json=bob)
 
     r = client.get("/leaderboard/overall")
     body = r.json()
     assert len(body["entries"]) == 2
-    # Alice: 90/180 = 0.5; Bob: 180/200 = 0.9 → Alice #1
     assert body["entries"][0]["contributor"] == "Alice"
     assert body["entries"][1]["contributor"] == "Bob"
     assert body["entries"][0]["rank"] == 1

@@ -34,17 +34,22 @@ def invalidate_overall_cache() -> None:
 
 @router.get("/overall", response_model=OverallLeaderboard)
 async def get_overall_leaderboard():
-    """Cross-spec leaderboard: ranks contributors by breadth-normalized score.
+    """Cross-spec leaderboard: ranks contributors by breadth-normalized percentile rank.
 
-    overall_score = mean(normalized_score) across ALL active-round specs.
-    Unentered specs contribute 1.0 (baseline performance) to the mean.
-    A normalized_score < 1.0 means the agent beat baseline on that spec.
-    Lower overall_score = better (consistently below baseline on more specs).
+    overall_score = mean(per_spec_rank_fraction) across ALL 45 active-round specs.
 
-    This rewards well-rounded agents: a specialist dominating 3 easy specs
-    cannot beat a generalist that is merely good across all 45.
-    avg_rank is also computed (over entered specs only) for display purposes.
+    Per-spec rank fraction = rank / (N + 1) where N = number of contributors entered.
+    Not entering a spec counts as rank N+1, yielding exactly 1.0 (worst possible).
+    Best contributor on a spec gets 1/(N+1); worst gets N/(N+1).
+
+    This is fully metric-agnostic — deflection_mm, stiffness_to_weight, and mass_grams
+    are treated identically regardless of how hard their baselines are to achieve.
+
+    Lower overall_score = better. A perfect generalist sweeping all 45 specs → 1/(N+1).
+    A mass-only specialist entering 15 specs: (15 * 1/(N+1) + 30 * 1.0) / 45.
+
     Only active-round specs contribute; legacy seed specs are excluded.
+    avg_rank is also included over entered specs only for display purposes.
     """
     global _overall_cache
     now = time.monotonic()
@@ -64,7 +69,6 @@ async def _compute_overall_leaderboard() -> OverallLeaderboard:
     all_specs = spec_store.load_all()
     round_specs = [s for s in all_specs if s.id in active_spec_ids]
     total_specs = len(round_specs)
-    baseline_by_spec = {s.id: s.scoring.baseline_score for s in round_specs}
     direction_by_spec = {s.id: s.scoring.direction for s in round_specs}
 
     if not round_specs:
@@ -106,26 +110,27 @@ async def _compute_overall_leaderboard() -> OverallLeaderboard:
                 best_by[spec_id][contributor] = dict(row)
 
     # Rank contributors within each spec, then build per-contributor best lists.
+    # normalized_score = rank / (N + 1), where N = entries for that spec.
+    # Not entering gives rank N+1 → normalized = 1.0 (worst possible, used below).
     contrib_bests: dict[str, list[OverallBestEntry]] = defaultdict(list)
     for spec_id, contrib_map in best_by.items():
         direction = direction_by_spec.get(spec_id, "minimize")
-        baseline = baseline_by_spec.get(spec_id, 1.0)
-        # Sort by score to determine ranks
+        n_entered = len(contrib_map)
+        # Sort by score to determine ranks (1 = best)
         ranked = sorted(
             contrib_map.values(),
             key=lambda r: r["score"],
             reverse=(direction == "maximize"),
         )
         for rank_idx, row in enumerate(ranked):
+            rank = rank_idx + 1
+            # Percentile rank: 1/(N+1) = best, N/(N+1) = worst, 1.0 = not entered.
+            normalized = rank / (n_entered + 1)
             score = row["score"]
-            if direction == "maximize":
-                normalized = (baseline / score) if score else 1.0
-            else:
-                normalized = (score / baseline) if baseline else 1.0
             contrib_bests[row["contributor"]].append(
                 OverallBestEntry(
                     spec_id=spec_id,
-                    rank=rank_idx + 1,
+                    rank=rank,
                     mass_grams=row["mass_grams"],
                     score=score,
                     score_metric=row["score_metric"],
