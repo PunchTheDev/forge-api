@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- **round_001 name** (`data/rounds/round_001.json`, PR #59): renamed from "Round 1 — Cantilever Bracket" to "Round 1 — Mass Optimization". All three rounds are cantilever bracket problems — the previous name described the problem domain, not the optimization objective, making round_001 look like the only meaningful category.
+
 ---
 
 ## [0.14.1] — 2026-06-03
