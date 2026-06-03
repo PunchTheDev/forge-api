@@ -61,6 +61,21 @@ async def get_overall_leaderboard():
     return result
 
 
+@router.get("/overall/{contributor}", response_model=OverallLeaderboardEntry)
+async def get_contributor_standing(contributor: str):
+    """Return a single contributor's overall standing.
+
+    Case-insensitive substring match — 'alice' matches 'Alice123'.
+    Returns 404 if no contributor with a matching name has any active-round submissions.
+    """
+    leaderboard = await get_overall_leaderboard()
+    query = contributor.lower()
+    for entry in leaderboard.entries:
+        if query in entry.contributor.lower():
+            return entry
+    raise HTTPException(status_code=404, detail=f"No active-round submissions found for contributor matching '{contributor}'")
+
+
 async def _compute_overall_leaderboard() -> OverallLeaderboard:
     # Only rank against active-round specs; legacy seed specs are excluded.
     active_rounds = [r for r in _load_rounds() if r.status == "active"]
