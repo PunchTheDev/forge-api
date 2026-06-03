@@ -4,6 +4,14 @@
 
 ---
 
+## [0.11.0] — 2026-06-03
+
+### Fixed
+- `GET /leaderboard/overall`: scoped to active-round specs only; excludes legacy seed specs (`001_bracket`, `pub_*`) so `total_specs` returns 45 and `avg_normalized_score` reflects only competition entries
+- `OverallBestEntry` now carries correct `score` + `score_metric` for stiffness-to-weight and deflection specs (was always returning `mass_grams = 0` for non-mass rounds)
+
+---
+
 ## [0.10.0] — 2026-06-03
 
 ### Added
