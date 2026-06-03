@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- **S3-compatible STEP file storage** (PR #47, `app/storage.py`, `app/routes/submissions.py`, `app/db.py`): When `S3_BUCKET` is set, STEP files are uploaded to S3 on submission and served via presigned redirect on `GET /submissions/{id}/step`. When unset, falls back to existing SQLite BLOB. Closes the known 4 GB scale cap. New `step_key TEXT` column added via migration. S3 upload failures return 503. 4 new tests added.
+
 ### Fixed
 - **Eval preview container zombie on timeout + missing security flags** (PR #45, `app/routes/eval_preview.py`): `proc.kill()` terminated the `docker run` client but not the container — hung evals kept consuming 4 GB RAM + 2 CPUs until they finished. Named containers (uuid-based) + explicit `docker kill <name>` on timeout. Also added `--cap-drop ALL` and `--pids-limit 256` to match CI eval sandbox flags; `_build_docker_cmd` now takes `container_name` arg.
 
