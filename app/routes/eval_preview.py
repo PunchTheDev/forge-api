@@ -21,6 +21,7 @@ import json
 import os
 import shutil
 import tempfile
+import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -94,6 +95,7 @@ async def eval_preview(body: PreviewRequest, request: Request):
         spec_path = matches[0]
     spec_raw = spec_path.read_text()
 
+    container_name = f"forge-preview-{uuid.uuid4().hex[:12]}"
     tmpdir = tempfile.mkdtemp(prefix="forge-preview-")
     try:
         agent_file = os.path.join(tmpdir, "agent.py")
@@ -104,7 +106,7 @@ async def eval_preview(body: PreviewRequest, request: Request):
         with open(spec_file, "w") as f:
             f.write(spec_raw)
 
-        cmd = _build_docker_cmd(tmpdir)
+        cmd = _build_docker_cmd(tmpdir, container_name)
 
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -127,6 +129,14 @@ async def eval_preview(body: PreviewRequest, request: Request):
             )
         except asyncio.TimeoutError:
             proc.kill()
+            # Kill the named container so it doesn't linger after the client
+            # process is gone — proc.kill() terminates `docker run` but the
+            # container itself keeps running until explicitly stopped.
+            await asyncio.create_subprocess_exec(
+                "docker", "kill", container_name,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
             raise HTTPException(
                 status_code=504,
                 detail=f"Eval timed out after {PREVIEW_TIMEOUT}s",
@@ -155,10 +165,13 @@ async def eval_preview(body: PreviewRequest, request: Request):
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
-def _build_docker_cmd(tmpdir: str) -> list[str]:
+def _build_docker_cmd(tmpdir: str, container_name: str) -> list[str]:
     cmd = [
         "docker", "run", "--rm",
+        "--name", container_name,
         "--security-opt", "no-new-privileges",
+        "--cap-drop", "ALL",
+        "--pids-limit", "256",
         "--memory", "4g", "--cpus", "2",
         "-v", f"{tmpdir}:/preview:ro",
     ]

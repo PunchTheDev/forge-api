@@ -149,7 +149,7 @@ def test_preview_docker_cmd_no_duplicate_entrypoint():
     """Ensure the docker cmd doesn't duplicate the Dockerfile ENTRYPOINT."""
     from app.routes.eval_preview import _build_docker_cmd
 
-    cmd = _build_docker_cmd("/tmp/fake")
+    cmd = _build_docker_cmd("/tmp/fake", "forge-preview-test")
     # The ENTRYPOINT in the forge-eval image is `python3 -m benchmark.evaluate`.
     # It must appear exactly once — as the args following the image name.
     image_idx = cmd.index("forge-eval")
