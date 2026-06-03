@@ -113,3 +113,21 @@ def test_sota_has_step_true_when_step_key_set(client, monkeypatch):
     sota = client.get("/sota/001_bracket")
     assert sota.status_code == 200
     assert sota.json()["has_step"] is True
+
+
+def test_leaderboard_has_step_true_when_step_key_set(client, monkeypatch):
+    """Leaderboard has_step is True when step is stored in S3 (step_key set, step_data NULL)."""
+    monkeypatch.setenv("S3_BUCKET", "test-bucket")
+
+    mock_upload = AsyncMock(return_value="steps/lb-uuid.step")
+    mock_presign = AsyncMock(return_value="https://s3.example.com/steps/lb-uuid.step?sig=z")
+
+    with patch("app.storage.upload", mock_upload), patch("app.storage.presign", mock_presign):
+        resp = client.post("/submissions", json=_payload())
+        assert resp.status_code == 201
+
+    lb = client.get("/leaderboard/001_bracket")
+    assert lb.status_code == 200
+    entries = lb.json()["entries"]
+    assert len(entries) == 1
+    assert entries[0]["has_step"] is True

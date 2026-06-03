@@ -214,7 +214,7 @@ async def _build_leaderboard(spec_id: str) -> Leaderboard:
                COALESCE(s.score_direction, 'minimize') as score_direction,
                s.fea_stress_mpa, s.commit_hash,
                s.submitted_at, s.pr_number,
-               (s.step_data IS NOT NULL) as has_step
+               (s.step_data IS NOT NULL OR s.step_key IS NOT NULL) as has_step
         FROM submissions s
         INNER JOIN (
             SELECT contributor, {best_agg} as best_score
