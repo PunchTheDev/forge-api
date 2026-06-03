@@ -398,6 +398,77 @@ def test_batch_submissions_stores_score_fields(client: TestClient, monkeypatch):
     assert subs[0]["score_direction"] == "maximize"
 
 
+def test_batch_submissions_sota_eligible_false(client: TestClient, monkeypatch):
+    """Batch-inserted submissions are not SOTA-eligible (historical seed data)."""
+    monkeypatch.setenv("ADMIN_SECRET", "secret123")
+    item = {**GOOD_SUBMISSION, "commit_hash": "batch2"}
+    r = client.post("/admin/submissions/batch", json=[item],
+                    headers={"X-Admin-Token": "secret123"})
+    assert r.status_code == 200
+    subs = client.get("/submissions?passed_only=false").json()
+    assert len(subs) == 1
+    # Batch entries should never be SOTA-eligible — they are seed/historical data.
+    assert subs[0]["sota_eligible"] is False
+
+
+# --- DELETE /submissions/{id} ---
+
+def test_delete_submission_requires_auth(client: TestClient, monkeypatch):
+    """DELETE /submissions/{id} rejects requests without X-Admin-Token."""
+    monkeypatch.setenv("ADMIN_SECRET", "secret123")
+    r = client.post("/submissions", json=GOOD_SUBMISSION)
+    sub_id = r.json()["id"]
+
+    del_r = client.delete(f"/submissions/{sub_id}")
+    assert del_r.status_code == 403
+
+
+def test_delete_submission_removes_entry(client: TestClient, monkeypatch):
+    """DELETE /submissions/{id} removes the entry from the DB."""
+    monkeypatch.setenv("ADMIN_SECRET", "secret123")
+    r = client.post("/submissions", json=GOOD_SUBMISSION)
+    sub_id = r.json()["id"]
+
+    del_r = client.delete(f"/submissions/{sub_id}", headers={"X-Admin-Token": "secret123"})
+    assert del_r.status_code == 204
+
+    get_r = client.get(f"/submissions/{sub_id}")
+    assert get_r.status_code == 404
+
+
+def test_delete_submission_404_not_found(client: TestClient, monkeypatch):
+    """DELETE /submissions/{id} returns 404 for unknown IDs."""
+    monkeypatch.setenv("ADMIN_SECRET", "secret123")
+    del_r = client.delete(
+        "/submissions/00000000-0000-0000-0000-000000000000",
+        headers={"X-Admin-Token": "secret123"},
+    )
+    assert del_r.status_code == 404
+
+
+# --- GET /submissions contributor filter ---
+
+def test_list_submissions_filter_contributor(client: TestClient):
+    """?contributor= returns only submissions from that contributor."""
+    client.post("/submissions", json=GOOD_SUBMISSION)
+    other = {**GOOD_SUBMISSION, "contributor": "OtherMiner", "commit_hash": "xyz9"}
+    client.post("/submissions", json=other)
+
+    r = client.get("/submissions?contributor=TestMiner&passed_only=false")
+    assert r.status_code == 200
+    subs = r.json()
+    assert len(subs) == 1
+    assert subs[0]["contributor"] == "TestMiner"
+
+
+def test_list_submissions_contributor_no_match(client: TestClient):
+    """?contributor= returns empty list when no submissions match."""
+    client.post("/submissions", json=GOOD_SUBMISSION)
+    r = client.get("/submissions?contributor=nobody&passed_only=false")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
 # --- hidden admin endpoint auth ---
 
 def test_hidden_spec_returns_503_when_key_unset(client: TestClient, monkeypatch):
