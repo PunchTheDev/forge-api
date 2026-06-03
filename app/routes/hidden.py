@@ -7,6 +7,7 @@ sample per round for post-merge consistency evaluation.
 
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import uuid
@@ -18,14 +19,13 @@ from app.db import get_db
 
 router = APIRouter(prefix="/admin/hidden", tags=["admin"])
 
-ADMIN_KEY = os.environ.get("FORGE_ADMIN_KEY", "")
-
 
 def _require_admin(authorization: str = Header(default="")) -> None:
-    if not ADMIN_KEY:
+    key = os.environ.get("FORGE_ADMIN_KEY", "")
+    if not key:
         raise HTTPException(status_code=503, detail="Admin key not configured on server.")
     token = authorization.removeprefix("Bearer ").strip()
-    if token != ADMIN_KEY:
+    if not hmac.compare_digest(token, key):
         raise HTTPException(status_code=403, detail="Invalid admin key.")
 
 
