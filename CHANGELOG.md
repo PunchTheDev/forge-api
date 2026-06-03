@@ -4,6 +4,13 @@
 
 ---
 
+## [0.13.2] — 2026-06-03
+
+### Fixed
+- `POST /admin/submissions/batch`: missing `score`, `score_metric`, `score_direction` from INSERT — batch-seeded submissions had NULL scores, breaking SOTA lookups for those entries.
+
+---
+
 ## [0.13.1] — 2026-06-03
 
 ### Fixed
