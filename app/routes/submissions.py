@@ -9,6 +9,7 @@ from fastapi.responses import Response
 from app.db import get_db
 from app.models import Submission, SubmissionCreate
 from app.notify import send_sota_alert
+from app.routes.leaderboard import invalidate_overall_cache
 from app.scoring import sota_eligible as compute_sota_eligible
 
 router = APIRouter(prefix="/submissions", tags=["submissions"])
@@ -68,6 +69,9 @@ async def create_submission(body: SubmissionCreate):
             ),
         )
         await db.commit()
+
+    if body.passed:
+        invalidate_overall_cache()
 
     if eligible and body.passed:
         await send_sota_alert(

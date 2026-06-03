@@ -22,6 +22,16 @@ _overall_cache: tuple[float, OverallLeaderboard] | None = None
 _OVERALL_TTL = 60.0  # seconds
 
 
+def invalidate_overall_cache() -> None:
+    """Drop the in-memory overall leaderboard cache.
+
+    Call this after any submission is accepted so the next request
+    recomputes rankings instead of serving a stale result.
+    """
+    global _overall_cache
+    _overall_cache = None
+
+
 @router.get("/overall", response_model=OverallLeaderboard)
 async def get_overall_leaderboard():
     """Cross-spec leaderboard: ranks contributors by breadth-normalized score.
