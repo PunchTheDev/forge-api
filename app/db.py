@@ -52,6 +52,10 @@ MIGRATE_ADD_SCORE_DIRECTION = """
 ALTER TABLE submissions ADD COLUMN score_direction TEXT DEFAULT 'minimize'
 """
 
+MIGRATE_ADD_STEP_KEY = """
+ALTER TABLE submissions ADD COLUMN step_key TEXT
+"""
+
 CREATE_HIDDEN_SPECS = """
 CREATE TABLE IF NOT EXISTS hidden_specs (
     id          TEXT PRIMARY KEY,
@@ -129,6 +133,8 @@ async def init_db() -> None:
             await db.execute(MIGRATE_ADD_SCORE_METRIC)
         if "score_direction" not in cols:
             await db.execute(MIGRATE_ADD_SCORE_DIRECTION)
+        if "step_key" not in cols:
+            await db.execute(MIGRATE_ADD_STEP_KEY)
         # Indexes — run after migrations so all columns exist.
         for idx in CREATE_INDEXES:
             await db.execute(idx)
