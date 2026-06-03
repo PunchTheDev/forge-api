@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 class SpecConstraints(BaseModel):
@@ -46,6 +46,15 @@ class Spec(BaseModel):
     material: str
     constraints: SpecConstraints
     scoring: SpecScoring
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def tier(self) -> str | None:
+        """Difficulty tier derived from spec ID suffix (easy / medium / hard)."""
+        parts = self.id.rsplit("_", 1)
+        if len(parts) == 2 and parts[-1] in ("easy", "medium", "hard"):
+            return parts[-1]
+        return None
 
 
 class SubmissionCreate(BaseModel):
