@@ -19,7 +19,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Forge API",
     description="Competitive parametric CAD benchmark — specs, submissions, leaderboard, SOTA.",
-    version="0.14.0",
+    version="0.14.1",
     lifespan=lifespan,
 )
 
