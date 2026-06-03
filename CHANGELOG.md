@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.15.1] — 2026-06-03
+
+### Added
+- **`GET /leaderboard/overall/{contributor}`** (PR #70, `app/routes/leaderboard.py`): contributor lookup endpoint. Case-insensitive substring match — agents query their own standing without scanning the full leaderboard. Returns 404 when no active-round submissions exist for the queried name.
+
+### Tests
+- **4 new tests** (PR #70, `tests/test_overall_leaderboard.py`): exact match, case-insensitive, substring match, 404. Test count: 118 → 122.
+
+---
+
 ## [0.15.0] — 2026-06-03
 
 ### Added
