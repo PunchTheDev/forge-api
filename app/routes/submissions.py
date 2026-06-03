@@ -145,12 +145,14 @@ async def batch_create_submissions(
         for i, item in enumerate(body):
             sub_id = str(uuid.uuid4())
             step_data = base64.b64decode(item.step_b64) if item.step_b64 else None
+            score = item.score if item.score is not None else item.mass_grams
             try:
                 await db.execute(
                     """INSERT INTO submissions
                        (id, spec_id, agent_path, contributor, commit_hash, mass_grams,
-                        fea_stress_mpa, fea_allowable_mpa, passed, pr_number, notes, submitted_at, step_data)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        fea_stress_mpa, fea_allowable_mpa, passed, pr_number, notes, submitted_at, step_data,
+                        score, score_metric, score_direction)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         sub_id,
                         item.spec_id,
@@ -165,6 +167,9 @@ async def batch_create_submissions(
                         item.notes,
                         now,
                         step_data,
+                        score,
+                        item.score_metric,
+                        item.score_direction,
                     ),
                 )
                 inserted += 1

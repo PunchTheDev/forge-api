@@ -345,3 +345,28 @@ def test_sota_history_records_improvements(client: TestClient):
     assert len(history) == 2
     assert history[0]["score"] == 100.0
     assert history[1]["score"] == 90.0
+
+
+# --- admin batch ---
+
+def test_batch_submissions_requires_auth(client: TestClient, monkeypatch):
+    monkeypatch.setenv("ADMIN_SECRET", "secret123")
+    r = client.post("/admin/submissions/batch", json=[GOOD_SUBMISSION])
+    assert r.status_code == 403
+
+
+def test_batch_submissions_stores_score_fields(client: TestClient, monkeypatch):
+    """Batch insert must persist score, score_metric, score_direction."""
+    monkeypatch.setenv("ADMIN_SECRET", "secret123")
+    item = {**GOOD_SUBMISSION, "score": 3.75, "score_metric": "stiffness_to_weight",
+            "score_direction": "maximize", "commit_hash": "batch1"}
+    r = client.post("/admin/submissions/batch", json=[item],
+                    headers={"X-Admin-Token": "secret123"})
+    assert r.status_code == 200
+    assert r.json()["inserted"] == 1
+
+    subs = client.get("/submissions?passed_only=false").json()
+    assert len(subs) == 1
+    assert subs[0]["score"] == 3.75
+    assert subs[0]["score_metric"] == "stiffness_to_weight"
+    assert subs[0]["score_direction"] == "maximize"
