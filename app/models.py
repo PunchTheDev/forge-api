@@ -56,6 +56,16 @@ class Spec(BaseModel):
             return parts[-1]
         return None
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def round_id(self) -> str | None:
+        """Round ID derived from spec ID prefix (r01_ → round_001, r02_ → round_002, etc.)."""
+        import re
+        m = re.match(r"^r(\d+)_", self.id)
+        if m:
+            return f"round_{int(m.group(1)):03d}"
+        return None
+
 
 class SubmissionCreate(BaseModel):
     spec_id: str

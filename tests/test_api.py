@@ -617,3 +617,70 @@ def test_spec_tier_field_in_response(client: TestClient):
     r = client.get("/specs/001_bracket")
     assert r.status_code == 200
     assert r.json()["tier"] is None
+
+
+def _specs_multi_client(tmp_path, monkeypatch):
+    """Return a TestClient backed by the specs_multi fixture directory."""
+    import importlib
+    import app.db
+    import app.specs as app_specs
+    import app.main
+
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("SPECS_DIR", "tests/fixtures/specs_multi")
+    importlib.reload(app.db)
+    importlib.reload(app_specs)
+    importlib.reload(app.main)
+    from app.main import app
+    from fastapi.testclient import TestClient as TC
+    return TC(app)
+
+
+def test_list_specs_round_id_filter(tmp_path, monkeypatch):
+    """GET /specs?round_id=round_001 returns only r01_* specs."""
+    with _specs_multi_client(tmp_path, monkeypatch) as c:
+        r = c.get("/specs?round_id=round_001")
+    assert r.status_code == 200
+    specs = r.json()
+    assert len(specs) >= 1
+    assert all(s["round_id"] == "round_001" for s in specs)
+    ids = [s["id"] for s in specs]
+    assert all(i.startswith("r01_") for i in ids)
+
+
+def test_list_specs_round_id_filter_round_002(tmp_path, monkeypatch):
+    """GET /specs?round_id=round_002 returns only r02_* specs."""
+    with _specs_multi_client(tmp_path, monkeypatch) as c:
+        r = c.get("/specs?round_id=round_002")
+    assert r.status_code == 200
+    specs = r.json()
+    assert len(specs) >= 1
+    assert all(s["round_id"] == "round_002" for s in specs)
+
+
+def test_list_specs_material_filter(tmp_path, monkeypatch):
+    """GET /specs?material=aluminum_6061 returns only aluminum specs."""
+    with _specs_multi_client(tmp_path, monkeypatch) as c:
+        r = c.get("/specs?material=aluminum_6061")
+    assert r.status_code == 200
+    specs = r.json()
+    assert len(specs) >= 1
+    assert all(s["material"] == "aluminum_6061" for s in specs)
+
+
+def test_list_specs_round_and_tier_combined(tmp_path, monkeypatch):
+    """GET /specs?round_id=round_001&tier=easy returns intersection."""
+    with _specs_multi_client(tmp_path, monkeypatch) as c:
+        r = c.get("/specs?round_id=round_001&tier=easy")
+    assert r.status_code == 200
+    specs = r.json()
+    assert len(specs) >= 1
+    assert all(s["round_id"] == "round_001" for s in specs)
+    assert all(s["tier"] == "easy" for s in specs)
+
+
+def test_spec_round_id_field_in_response(client: TestClient):
+    """Spec response includes computed round_id field (None for legacy IDs)."""
+    r = client.get("/specs/001_bracket")
+    assert r.status_code == 200
+    assert r.json()["round_id"] is None

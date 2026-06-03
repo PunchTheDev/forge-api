@@ -1,0 +1,23 @@
+{
+  "id": "r01_001_easy",
+  "version": "1.0",
+  "name": "Cantilever Bracket — PLA — 11 kg @ 80 mm [easy, mass]",
+  "description": "An easy-difficulty cantilever bracket in PLA. Minimize mass while surviving the load.",
+  "material": "pla",
+  "constraints": {
+    "load_newtons": 107.9,
+    "load_point_mm": [80.0, 40.0, 40.0],
+    "safety_factor": 1.5,
+    "bolt_pattern_mm": [[0.0, 0.0], [50.0, 0.0], [0.0, 50.0], [50.0, 50.0]],
+    "bolt_diameter_clearance_mm": 6.5,
+    "mount_face_x_mm": 0.0,
+    "build_volume_mm": [150.0, 100.0, 80.0],
+    "max_overhang_deg": 50.0,
+    "min_wall_thickness_mm": 1.0
+  },
+  "scoring": {
+    "metric": "mass_grams",
+    "direction": "minimize",
+    "baseline_mass_grams": 180.0
+  }
+}
