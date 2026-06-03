@@ -81,3 +81,28 @@ def test_spec_tier_hard():
 def test_spec_tier_none_for_legacy_id():
     spec = Spec.model_validate(_make_minimal_spec("001_bracket"))
     assert spec.tier is None
+
+
+def test_spec_round_id_r01():
+    spec = Spec.model_validate(_make_minimal_spec("r01_001_easy"))
+    assert spec.round_id == "round_001"
+
+
+def test_spec_round_id_r02():
+    spec = Spec.model_validate(_make_minimal_spec("r02_003_hard"))
+    assert spec.round_id == "round_002"
+
+
+def test_spec_round_id_r10():
+    spec = Spec.model_validate(_make_minimal_spec("r10_001_easy"))
+    assert spec.round_id == "round_010"
+
+
+def test_spec_round_id_none_for_legacy():
+    spec = Spec.model_validate(_make_minimal_spec("001_bracket"))
+    assert spec.round_id is None
+
+
+def test_spec_round_id_none_for_pub():
+    spec = Spec.model_validate(_make_minimal_spec("pub_002_medium"))
+    assert spec.round_id is None

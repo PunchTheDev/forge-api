@@ -1,0 +1,23 @@
+{
+  "id": "r02_001_medium",
+  "version": "1.0",
+  "name": "Cantilever Bracket — Al6061 — 30 kg @ 100 mm [medium, stiffness]",
+  "description": "A medium-difficulty cantilever bracket in Aluminum 6061-T6. Maximize stiffness-to-weight.",
+  "material": "aluminum_6061",
+  "constraints": {
+    "load_newtons": 294.3,
+    "load_point_mm": [100.0, 50.0, 40.0],
+    "safety_factor": 2.0,
+    "bolt_pattern_mm": [[0.0, 0.0], [50.0, 0.0], [0.0, 50.0], [50.0, 50.0]],
+    "bolt_diameter_clearance_mm": 5.5,
+    "mount_face_x_mm": 0.0,
+    "build_volume_mm": [140.0, 90.0, 80.0],
+    "max_overhang_deg": 45.0,
+    "min_wall_thickness_mm": 1.2
+  },
+  "scoring": {
+    "metric": "stiffness_to_weight",
+    "direction": "maximize",
+    "baseline_stiffness_to_weight": 300.0
+  }
+}
