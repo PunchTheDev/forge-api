@@ -23,9 +23,6 @@
 - `GET /leaderboard/overall` N+1 query loop (one query per active spec) collapsed into a single query. Best-per-contributor aggregation and ranking now done in Python.
 - In-memory TTL cache (60 seconds) for `/leaderboard/overall`. Cache invalidated immediately on submission create, delete, or batch-insert.
 
-### Known scaling limitation (operator action required before 100+ miners)
-- STEP files are stored as BLOBs in SQLite. At 100 miners × 45 specs × ~5 MB/file, the DB will exceed 20 GB. Recommended fix: move STEP storage to S3-compatible object storage (e.g. R2 or MinIO) and store object keys in the `step_data` column. Until this is done, limit `step_b64` ingestion or increase SQLite page limits via `PRAGMA max_page_count`.
-
 ---
 
 ## [0.13.2] — 2026-06-03
