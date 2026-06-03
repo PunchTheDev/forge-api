@@ -30,6 +30,19 @@ async def create_submission(body: SubmissionCreate):
     eligible, old_sota_score = await _compute_eligibility(body.spec_id, score_for_eligibility, body.score_direction)
 
     async with get_db() as db:
+        # Dedup: reject duplicate (commit_hash, spec_id) regardless of contributor name.
+        # Prevents replay attacks via contributor name cycling.
+        async with db.execute(
+            "SELECT id FROM submissions WHERE commit_hash = ? AND spec_id = ?",
+            (body.commit_hash, body.spec_id),
+        ) as cur:
+            dup = await cur.fetchone()
+        if dup is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"commit_hash '{body.commit_hash}' already scored for spec '{body.spec_id}'.",
+            )
+
         async with db.execute(
             "SELECT COUNT(*) FROM submissions WHERE contributor = ? AND submitted_at >= ?",
             (body.contributor, today),
