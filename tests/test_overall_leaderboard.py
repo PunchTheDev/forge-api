@@ -145,3 +145,38 @@ def test_overall_total_wins_counts_correctly(client: TestClient):
     assert entries["Bob"]["total_wins"] == 1    # only spec2
     assert entries["Alice"]["specs_entered"] == 2
     assert entries["Bob"]["specs_entered"] == 1
+
+
+# ── GET /leaderboard/overall/{contributor} ─────────────────────────────────
+
+def test_contributor_standing_found(client: TestClient):
+    """GET /leaderboard/overall/{name} returns that contributor's entry."""
+    client.post("/submissions", json=SPEC1_SUB)
+    r = client.get("/leaderboard/overall/TestMiner")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["contributor"] == "TestMiner"
+    assert body["rank"] == 1
+    assert body["specs_entered"] == 1
+
+
+def test_contributor_standing_case_insensitive(client: TestClient):
+    """Contributor lookup is case-insensitive substring match."""
+    client.post("/submissions", json=SPEC1_SUB)
+    r = client.get("/leaderboard/overall/testminer")
+    assert r.status_code == 200
+    assert r.json()["contributor"] == "TestMiner"
+
+
+def test_contributor_standing_substring_match(client: TestClient):
+    """Partial name match works: 'Miner' matches 'TestMiner'."""
+    client.post("/submissions", json=SPEC1_SUB)
+    r = client.get("/leaderboard/overall/Miner")
+    assert r.status_code == 200
+    assert r.json()["contributor"] == "TestMiner"
+
+
+def test_contributor_standing_not_found(client: TestClient):
+    """Returns 404 when no submissions match the contributor query."""
+    r = client.get("/leaderboard/overall/nobody")
+    assert r.status_code == 404
