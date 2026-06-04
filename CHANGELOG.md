@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.15.6] — 2026-06-04
+
+### Fixed
+- **`GET /specs?unclaimed=true` scope** (`app/routes/specs.py`): filter now restricts to active-round specs only (as `?active=true` would). Previously returned all 108+ specs with no passing submission — including Thingiverse catalog entries with `round_id=None`. Now returns 42 (the actual competition specs without a SOTA). Non-competition specs are never "claimable."
+
+### Tests
+- `test_specs_unclaimed_filter_*` tests updated: new `unclaimed_client` fixture with `SPECS_DIR=tests/fixtures/specs_round` and `ROUNDS_DIR=tests/fixtures/rounds_active`; new `tests/fixtures/specs_round/r01_001_easy.json`. `_make_client()` now reloads `app.specs` to prevent stale `SPECS_DIR` across tests. Test count: 138 (count unchanged, tests updated).
+
+---
+
 ## [0.15.5] — 2026-06-04
 
 ### Added
