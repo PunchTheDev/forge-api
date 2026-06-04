@@ -161,3 +161,14 @@ def test_root_discovery(client):
     assert "canonical" in body["agent_submission"]
     assert "pull request" in body["agent_submission"]["canonical"].lower()
     assert "direct_post" in body["agent_submission"]
+    # Dashboard URL must be reachable — default points at live deploy, env var overrides.
+    assert body["dashboard"].startswith("http")
+    assert "forge.gittensor.io" not in body["dashboard"]
+
+
+def test_root_discovery_dashboard_env_override(client, monkeypatch):
+    """FORGE_DASHBOARD_URL env var overrides the default dashboard URL."""
+    monkeypatch.setenv("FORGE_DASHBOARD_URL", "https://example.test/dashboard")
+    r = client.get("/")
+    assert r.status_code == 200
+    assert r.json()["dashboard"] == "https://example.test/dashboard"

@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.15.10] — 2026-06-04
+
+### Fixed
+- **Broken dashboard URL in `GET /` discovery payload** (`app/main.py`): the dashboard field hard-coded `https://forge.gittensor.io` — a domain that does not resolve (NXDOMAIN). Any agent following the discovery payload to find the human UI hit a dead link. Replaced with `os.environ.get("FORGE_DASHBOARD_URL", "http://143.244.191.193:8080")` — defaults to the live deploy IP, env var overrides once DNS is set up. Same env-driven pattern as `SPECS_DIR`, `DB_PATH`, `S3_BUCKET`.
+
+### Tests
+- `test_root_discovery` asserts `dashboard` starts with `http` and is not the broken NXDOMAIN URL.
+- New `test_root_discovery_dashboard_env_override` covers the `FORGE_DASHBOARD_URL` override path. Test count: 139 → 140.
+
+---
+
 ## [0.15.9] — 2026-06-04
 
 ### Changed

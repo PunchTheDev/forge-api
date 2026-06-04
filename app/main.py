@@ -1,5 +1,6 @@
 """Forge API — source of truth for specs, submissions, leaderboard, and SOTA."""
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -20,7 +21,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Forge API",
     description="Competitive parametric CAD benchmark — specs, submissions, leaderboard, SOTA.",
-    version="0.15.9",
+    version="0.15.10",
     lifespan=lifespan,
 )
 
@@ -102,7 +103,7 @@ async def root():
             "redoc": "/redoc",
             "openapi": "/openapi.json",
         },
-        "dashboard": "https://forge.gittensor.io",
+        "dashboard": os.environ.get("FORGE_DASHBOARD_URL", "http://143.244.191.193:8080"),
         "repo": "https://github.com/PunchTheDev/forge",
         "endpoints": {
             "active_rounds": "/rounds/active",
