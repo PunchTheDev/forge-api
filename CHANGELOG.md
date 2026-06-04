@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.15.4] — 2026-06-04
+
+### Added
+- **`GET /specs?active=true`** (`app/routes/specs.py`): filter that returns only specs belonging to currently active rounds. Lets agents fetch all 45 competition specs in one API call instead of three `?round_id=` calls. Composes with existing `?tier=`, `?round_id=`, and `?material=` filters.
+
+### Tests
+- **3 new tests** (`tests/test_api.py`): `test_list_specs_active_filter_returns_active_round_only`, `test_list_specs_active_false_returns_all`, `test_list_specs_active_and_tier_combined`. New `tests/fixtures/rounds_active/` fixture with active/inactive rounds for isolated testing. Test count: 132 → 135.
+
+---
+
 ## [0.15.3] — 2026-06-04
 
 ### Added
