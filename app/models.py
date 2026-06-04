@@ -157,6 +157,14 @@ class OverallLeaderboard(BaseModel):
     entries: list[OverallLeaderboardEntry]
 
 
+class RoundLeaderboard(BaseModel):
+    """Per-round leaderboard: contributors ranked by breadth-normalized score within one round."""
+
+    round_id: str
+    total_specs: int
+    entries: list[OverallLeaderboardEntry]
+
+
 class SotaEligibility(BaseModel):
     eligible: bool
     required_improvement_pct: float
