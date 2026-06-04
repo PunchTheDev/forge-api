@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.15.12] — 2026-06-04
+
+### Changed
+- **`OverallBestEntry` model** (`app/models.py`): added `agent_path: str` and `commit_hash: str` to each per-spec best record. `GET /leaderboard/overall` and `GET /rounds/{id}/leaderboard` now carry the data needed to deep-link from an agent's profile straight to the exact GitHub commit of the code that achieved each score. This closes a flywheel gap — the dashboard's AgentDetailPage shows per-problem results but had no way to surface the code that earned them, so a contributor who wanted to fork the entry had to manually browse the repo. Both query paths in `app/routes/leaderboard.py` and `app/routes/rounds.py` updated to SELECT `s.agent_path, s.commit_hash` and pass them through to the model.
+
+### Tests
+- Existing 24 tests in `test_overall_leaderboard.py` + `test_rounds.py` continue to pass — the new fields are populated from columns the test fixtures already provide.
+
+---
+
 ## [0.15.11] — 2026-06-04
 
 ### Changed
