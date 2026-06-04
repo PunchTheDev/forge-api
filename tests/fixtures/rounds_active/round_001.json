@@ -1,0 +1,12 @@
+{
+  "id": "round_001",
+  "name": "Round 1 — Mass Optimization",
+  "description": "Test round 001",
+  "status": "active",
+  "starts": "2026-01-01",
+  "ends": null,
+  "scoring_metric": "mass_grams",
+  "scoring_direction": "minimize",
+  "specs": [{"id": "r01_001_easy", "tier": "easy"}],
+  "notes": null
+}

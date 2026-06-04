@@ -679,6 +679,60 @@ def test_list_specs_round_and_tier_combined(tmp_path, monkeypatch):
     assert all(s["tier"] == "easy" for s in specs)
 
 
+def _specs_active_client(tmp_path, monkeypatch):
+    """TestClient with specs_multi + rounds_active fixture (round_001 active, round_002 inactive)."""
+    import importlib
+    import app.db
+    import app.specs as app_specs
+    import app.routes.specs as specs_route
+    import app.main
+
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("SPECS_DIR", "tests/fixtures/specs_multi")
+    monkeypatch.setenv("ROUNDS_DIR", "tests/fixtures/rounds_active")
+    importlib.reload(app.db)
+    importlib.reload(app_specs)
+    importlib.reload(specs_route)
+    importlib.reload(app.main)
+    from app.main import app
+    from fastapi.testclient import TestClient as TC
+    return TC(app)
+
+
+def test_list_specs_active_filter_returns_active_round_only(tmp_path, monkeypatch):
+    """GET /specs?active=true returns only specs from active rounds."""
+    with _specs_active_client(tmp_path, monkeypatch) as c:
+        r = c.get("/specs?active=true")
+    assert r.status_code == 200
+    specs = r.json()
+    ids = [s["id"] for s in specs]
+    # r01_001_easy is in round_001 (active) — should appear
+    assert "r01_001_easy" in ids
+    # r02_001_medium is in round_002 (inactive) — must not appear
+    assert "r02_001_medium" not in ids
+    # legacy 001_bracket has round_id=None — not in any active round
+    assert "001_bracket" not in ids
+
+
+def test_list_specs_active_false_returns_all(tmp_path, monkeypatch):
+    """GET /specs?active=false (falsy) returns all specs unfiltered."""
+    with _specs_active_client(tmp_path, monkeypatch) as c:
+        all_specs = c.get("/specs").json()
+        active_specs = c.get("/specs?active=false").json()
+    assert len(active_specs) == len(all_specs)
+
+
+def test_list_specs_active_and_tier_combined(tmp_path, monkeypatch):
+    """GET /specs?active=true&tier=easy composes correctly."""
+    with _specs_active_client(tmp_path, monkeypatch) as c:
+        r = c.get("/specs?active=true&tier=easy")
+    assert r.status_code == 200
+    specs = r.json()
+    assert all(s["tier"] == "easy" for s in specs)
+    # all returned specs must be from active rounds
+    assert all(s["round_id"] == "round_001" for s in specs)
+
+
 def test_spec_round_id_field_in_response(client: TestClient):
     """Spec response includes computed round_id field (None for legacy IDs)."""
     r = client.get("/specs/001_bracket")

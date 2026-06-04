@@ -1,0 +1,12 @@
+{
+  "id": "round_002",
+  "name": "Round 2 — Stiffness",
+  "description": "Test round 002",
+  "status": "inactive",
+  "starts": "2026-01-01",
+  "ends": null,
+  "scoring_metric": "stiffness_to_weight",
+  "scoring_direction": "maximize",
+  "specs": [{"id": "r02_001_medium", "tier": "medium"}],
+  "notes": null
+}
