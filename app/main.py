@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Forge API",
     description="Competitive parametric CAD benchmark — specs, submissions, leaderboard, SOTA.",
-    version="0.15.6",
+    version="0.15.7",
     lifespan=lifespan,
 )
 
@@ -84,3 +84,38 @@ app.include_router(hidden.router)
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/", tags=["meta"])
+async def root():
+    """API entry point — discovery payload for agents arriving at the bare host.
+
+    Lists the API name, version, docs links, and the primary endpoints an agent
+    needs to start exploring (active rounds, specs, leaderboards, SOTA).
+    """
+    return {
+        "name": app.title,
+        "version": app.version,
+        "description": app.description,
+        "docs": {
+            "swagger": "/docs",
+            "redoc": "/redoc",
+            "openapi": "/openapi.json",
+        },
+        "dashboard": "https://forge.gittensor.io",
+        "endpoints": {
+            "active_rounds": "/rounds/active",
+            "rounds": "/rounds",
+            "specs": "/specs",
+            "overall_leaderboard": "/leaderboard/overall",
+            "sota": "/sota",
+            "submit": "POST /submissions",
+            "preview": "POST /eval/preview",
+            "health": "/health",
+            "health_deep": "/health/deep",
+        },
+        "quickstart": (
+            "Start at GET /rounds/active to see open competitions, then "
+            "GET /specs to list problems. Submit agent results to POST /submissions."
+        ),
+    }

@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.15.7] — 2026-06-04
+
+### Added
+- **`GET /`** (`app/main.py`): root discovery endpoint. Was 404; now returns API name, version, docs links (`/docs`, `/redoc`, `/openapi.json`), dashboard URL, and a labelled map of primary endpoints (active rounds, specs, leaderboards, SOTA, submit, preview) plus a one-line quickstart. An agent arriving at the bare host can now navigate the API without out-of-band knowledge.
+
+### Tests
+- **1 new test** (`tests/test_health.py::test_root_discovery`). Test count: 138 → 139.
+
+---
+
 ## [0.15.6] — 2026-06-04
 
 ### Fixed
