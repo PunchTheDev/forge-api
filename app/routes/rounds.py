@@ -168,6 +168,7 @@ async def get_round_leaderboard(round_id: str):
         SELECT s.id as submission_id, s.spec_id, s.contributor,
                s.mass_grams, COALESCE(s.score, s.mass_grams) as score,
                COALESCE(s.score_metric, 'mass_grams') as score_metric,
+               s.agent_path, s.commit_hash,
                s.submitted_at
         FROM submissions s
         WHERE s.spec_id IN ({placeholders}) AND s.passed = 1
@@ -216,6 +217,8 @@ async def get_round_leaderboard(round_id: str):
                     normalized_score=normalized,
                     submission_id=row["submission_id"],
                     submitted_at=row["submitted_at"],
+                    agent_path=row["agent_path"],
+                    commit_hash=row["commit_hash"],
                 )
             )
 

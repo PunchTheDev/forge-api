@@ -140,6 +140,8 @@ class OverallBestEntry(BaseModel):
     normalized_score: float  # rank / (N+1) where N = entries for this spec; 1.0 = not entered
     submission_id: str
     submitted_at: datetime
+    agent_path: str  # repo path to this submission's agent dir (e.g. "agents/foo/v1")
+    commit_hash: str  # commit hash for deep-linking to the exact code on GitHub
 
 
 class OverallLeaderboardEntry(BaseModel):
