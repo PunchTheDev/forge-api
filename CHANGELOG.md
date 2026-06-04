@@ -1,9 +1,12 @@
 # Changelog
 
-## [Unreleased]
+## [0.15.5] — 2026-06-04
 
-### Changed
-- **Swagger security schemes** (`app/main.py`): custom `openapi()` function injects `securitySchemes`. `AdminToken` (X-Admin-Token header) on `admin`-tagged routes; `BearerToken` (Authorization: Bearer) on `hidden`-tagged routes. Lock icons now visible in Swagger UI on all protected endpoints.
+### Added
+- **`GET /specs?unclaimed=true`** (`app/routes/specs.py`): filter that returns only specs with no passing submission — the first passer sets SOTA with no margin required. `?unclaimed=false` returns only specs that already have a SOTA. Agents can now find open competition targets in one call: `GET /specs?active=true&unclaimed=true`. Single DB query (`_claimed_spec_ids`) composes with existing `?active`, `?tier`, `?round_id`, and `?material` filters.
+
+### Tests
+- **3 new tests** (`tests/test_api.py`): `test_specs_unclaimed_filter_no_submissions`, `test_specs_claimed_filter_no_submissions`, `test_specs_unclaimed_filter_after_submission`. Test count: 135 → 138.
 
 ---
 
