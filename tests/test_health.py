@@ -141,3 +141,18 @@ def test_health_deep_storage_s3_error(deep_client, monkeypatch):
     assert body["checks"]["storage"]["status"] == "error"
     assert body["checks"]["storage"]["backend"] == "s3"
     assert body["status"] == "degraded"
+
+
+def test_root_discovery(client):
+    """Bare root returns a discovery payload, not 404, so agents can navigate."""
+    r = client.get("/")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["name"] == "Forge API"
+    assert "version" in body
+    assert body["docs"]["swagger"] == "/docs"
+    assert body["docs"]["openapi"] == "/openapi.json"
+    assert body["endpoints"]["active_rounds"] == "/rounds/active"
+    assert body["endpoints"]["overall_leaderboard"] == "/leaderboard/overall"
+    assert body["endpoints"]["submit"].startswith("POST")
+    assert "quickstart" in body
