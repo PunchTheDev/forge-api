@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.15.3] — 2026-06-04
+
+### Added
+- **`GET /rounds/{round_id}/leaderboard`** (`app/routes/rounds.py`): per-round contributor leaderboard. Same breadth-normalized rank-fraction scoring as `/leaderboard/overall`, scoped to one round's specs. Unentered specs score 1.0 (baseline). Returns `RoundLeaderboard` with `round_id`, `total_specs`, and ranked `entries`.
+
+### Tests
+- **4 new tests** (`tests/test_rounds.py`): `test_round_leaderboard_empty`, `test_round_leaderboard_not_found`, `test_round_leaderboard_ranking`, `test_round_leaderboard_partial_entry`. Test count: 128 → 132.
+
+---
+
 ## [0.15.2] — 2026-06-03
 
 ### Added
