@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.13] — 2026-06-04
+
+### Performance
+- **Enable gzip compression for API responses** (`app/main.py`): added `GZipMiddleware(minimum_size=1000)` after CORS. JSON responses ≥1 KB are now compressed when the client sends `Accept-Encoding: gzip`. Measured locally on prod-shaped data: `GET /specs?active=true` 38,671 b → ~6 KB (-84%), `GET /submissions/<id>/step` (STEP body) ~45 KB → ~12 KB (-73%). Dashboard cold-load (5 API calls, ~95 KB uncompressed JSON) drops to ~20 KB on the wire. Uncompressed clients (curl without flag, identity-only) receive raw bodies unchanged via standard Accept-Encoding negotiation. Same audit class as forge-dashboard PR #260 — uniquely prod-only perf-leak, invisible to test suites.
+
+---
+
 ## [0.15.12] — 2026-06-04
 
 ### Changed

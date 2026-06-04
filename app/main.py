@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.utils import get_openapi
 
 from app.db import init_db
@@ -21,7 +22,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Forge API",
     description="Competitive parametric CAD benchmark — specs, submissions, leaderboard, SOTA.",
-    version="0.15.11",
+    version="0.15.13",
     lifespan=lifespan,
 )
 
@@ -70,6 +71,11 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+# Compress JSON responses ≥1 KB. Cuts /specs?active=true from ~38 KB to ~6 KB
+# on dashboard cold-load. Negotiated via Accept-Encoding; uncompressed clients
+# (curl without flag) receive identity unchanged.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.include_router(specs.router)
 app.include_router(submissions.router)
