@@ -52,7 +52,9 @@ async def list_specs(
     unclaimed: bool | None = Query(None, description="When true, return only specs with no passing submission (no SOTA set yet)"),
 ):
     specs = spec_store.load_all()
-    if active:
+    # unclaimed=true implies active-round context: non-competition specs (e.g.
+    # Thingiverse catalog entries) have no round and are never "claimable".
+    if active or unclaimed:
         active_ids = _active_round_ids()
         specs = [s for s in specs if s.round_id in active_ids]
     if tier is not None:

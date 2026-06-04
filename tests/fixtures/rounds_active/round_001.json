@@ -7,6 +7,6 @@
   "ends": null,
   "scoring_metric": "mass_grams",
   "scoring_direction": "minimize",
-  "specs": [{"id": "r01_001_easy", "tier": "easy"}],
+  "specs": [{"id": "r01_001_easy", "tier": "easy"}, {"id": "001_bracket", "tier": "easy"}],
   "notes": null
 }
