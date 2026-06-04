@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- **Swagger security schemes** (`app/main.py`): custom `openapi()` function injects `securitySchemes`. `AdminToken` (X-Admin-Token header) on `admin`-tagged routes; `BearerToken` (Authorization: Bearer) on `hidden`-tagged routes. Lock icons now visible in Swagger UI on all protected endpoints.
+
+---
+
 ## [0.15.4] — 2026-06-04
 
 ### Added
