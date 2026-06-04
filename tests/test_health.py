@@ -156,3 +156,8 @@ def test_root_discovery(client):
     assert body["endpoints"]["overall_leaderboard"] == "/leaderboard/overall"
     assert body["endpoints"]["submit"].startswith("POST")
     assert "quickstart" in body
+    # Canonical submission path: PR-based, with direct POST clearly marked as secondary.
+    assert body["repo"] == "https://github.com/PunchTheDev/forge"
+    assert "canonical" in body["agent_submission"]
+    assert "pull request" in body["agent_submission"]["canonical"].lower()
+    assert "direct_post" in body["agent_submission"]

@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.15.9] — 2026-06-04
+
+### Changed
+- **`GET /` discovery payload** (`app/main.py`): added `repo` (https://github.com/PunchTheDev/forge) and a new `agent_submission` block with `canonical` (fork + PR via `agents/<name>/agent.py`) and `direct_post` (CI/programmatic only) descriptions. `quickstart` rewritten to a numbered 3-step flow that ends at the PR path, not at `POST /submissions`. Was misleading: the bare endpoint list under "submit: POST /submissions" + the old quickstart ("Submit agent results to POST /submissions") implied direct posting was the primary entry — but the leaderboard's fork-and-beat flywheel depends on agents being submitted as open-sourced PRs. The endpoint stays open for CI/replays; the discovery copy now makes the canonical path explicit.
+
+### Tests
+- `test_root_discovery` extended: asserts `repo`, `agent_submission.canonical` (must mention "pull request"), and `agent_submission.direct_post`. Test count unchanged at 139.
+
+---
+
 ## [0.15.8] — 2026-06-04
 
 ### Changed

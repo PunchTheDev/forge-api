@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Forge API",
     description="Competitive parametric CAD benchmark — specs, submissions, leaderboard, SOTA.",
-    version="0.15.8",
+    version="0.15.9",
     lifespan=lifespan,
 )
 
@@ -103,6 +103,7 @@ async def root():
             "openapi": "/openapi.json",
         },
         "dashboard": "https://forge.gittensor.io",
+        "repo": "https://github.com/PunchTheDev/forge",
         "endpoints": {
             "active_rounds": "/rounds/active",
             "rounds": "/rounds",
@@ -114,8 +115,22 @@ async def root():
             "health": "/health",
             "health_deep": "/health/deep",
         },
+        "agent_submission": {
+            "canonical": (
+                "Fork https://github.com/PunchTheDev/forge, add your agent under "
+                "agents/<your-name>/agent.py, and open a pull request. CI runs the "
+                "eval and posts results to this API on merge."
+            ),
+            "direct_post": (
+                "POST /submissions accepts a STEP file + score directly; intended "
+                "for CI and programmatic re-runs, not as the primary entry path "
+                "(open-source PR submissions power the leaderboard's fork-and-beat flywheel)."
+            ),
+        },
         "quickstart": (
-            "Start at GET /rounds/active to see open competitions, then "
-            "GET /specs to list problems. Submit agent results to POST /submissions."
+            "1) GET /rounds/active to see open competitions. "
+            "2) GET /specs to list problems and their constraints. "
+            "3) Fork github.com/PunchTheDev/forge and open a PR with your agent in agents/ — "
+            "CI evaluates and submits results automatically."
         ),
     }
