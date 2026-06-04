@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.11] — 2026-06-04
+
+### Changed
+- **Round 1 description** (`data/rounds/round_001.json`): replaced the misleading sentence "The best generalist agent wins across all tiers." with "Together with Round 2 (stiffness-to-weight) and Round 3 (deflection), these 15 problems contribute to the overall leaderboard." The old wording implied a per-round winner, but the scoring model has no per-round ranking — `overall_score` is the mean normalized rank across **all 45 active problems across all 3 rounds**. A first-timer landing on the Mass Optimization page now learns the round's relationship to the rest of the competition instead of a false "round winner" framing.
+
+---
+
 ## [0.15.10] — 2026-06-04
 
 ### Fixed
