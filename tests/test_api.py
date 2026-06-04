@@ -44,6 +44,34 @@ def test_get_spec_missing(client: TestClient):
     assert r.status_code == 404
 
 
+def test_specs_unclaimed_filter_no_submissions(client: TestClient):
+    """?unclaimed=true returns all specs when there are no passing submissions."""
+    r = client.get("/specs?unclaimed=true")
+    assert r.status_code == 200
+    assert len(r.json()) == 1  # fixture has one spec; no submissions yet
+
+
+def test_specs_claimed_filter_no_submissions(client: TestClient):
+    """?unclaimed=false returns empty list when there are no passing submissions."""
+    r = client.get("/specs?unclaimed=false")
+    assert r.status_code == 200
+    assert len(r.json()) == 0  # nothing claimed yet
+
+
+def test_specs_unclaimed_filter_after_submission(client: TestClient):
+    """After a passing submission, ?unclaimed=true excludes the spec."""
+    # Create a passing submission for 001_bracket
+    client.post("/submissions", json=GOOD_SUBMISSION)
+    # Now 001_bracket is claimed
+    r_unclaimed = client.get("/specs?unclaimed=true")
+    assert r_unclaimed.status_code == 200
+    assert len(r_unclaimed.json()) == 0  # no unclaimed specs
+    # ?unclaimed=false should return it
+    r_claimed = client.get("/specs?unclaimed=false")
+    assert r_claimed.status_code == 200
+    assert len(r_claimed.json()) == 1
+
+
 def test_create_submission(client: TestClient):
     r = client.post("/submissions", json=GOOD_SUBMISSION)
     assert r.status_code == 201
