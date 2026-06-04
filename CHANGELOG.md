@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.8] — 2026-06-04
+
+### Changed
+- **Round 1 description** (`data/rounds/round_001.json`): "FEA safety requirements" → "passing structural simulation (FEA = Finite Element Analysis) — your bracket must survive the rated load with the required safety margin." First-timers reading the API or the home/category cards no longer encounter the undefined acronym; the explicit "survive the rated load" language ties the abstract simulation to the concrete pass/fail meaning.
+
+---
+
 ## [0.15.7] — 2026-06-04
 
 ### Added
